@@ -21,7 +21,8 @@ export default function Sidebar() {
     {
       title: "SALES ORDERS",
       items: [
-        { to: "/sales/work-orders", icon: FiFileText, label: "Work Orders" },
+        { to: "/sales/sales-orders", icon: FiFileText, label: "Sales Orders" },
+        { to: "/sales/purchase-orders/upload", icon: FiPackage, label: "Upload Sales Orders" },
         { to: "/sales/ready-to-dispatch", icon: FiBell, label: "Ready to Dispatch", badge: 2, badgeColor: "emerald" }
       ]
     },

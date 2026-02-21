@@ -45,14 +45,20 @@ export default function PurchaseOrderList() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center  justify-between">
         <div>
           <h2 className="text-xl font-black text-slate-800">Purchase Orders</h2>
           <p className="text-xs text-slate-400 mt-0.5">Track vendor orders and material arrival</p>
         </div>
+        <div className="flex gap-9">
         <BtnPrimary onClick={() => navigate('/sales/purchase-orders/create')}>
           <FiPlus size={14} /> Create PO
         </BtnPrimary>
+        <BtnPrimary onClick={() => navigate('/sales/purchase-orders/upload')}>
+          <FiPlus size={14} /> Upload PO
+        </BtnPrimary>
+
+        </div>
       </div>
 
       {/* Critical Alerts */}

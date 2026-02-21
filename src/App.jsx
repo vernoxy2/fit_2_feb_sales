@@ -5,7 +5,7 @@ import Dashboard from "./Sales-ManagerPages/Sales-Pages/Dashboard";
 import LowStockManagement from "./Sales-ManagerPages/Sales-Pages/LowStockManagement";
 import CategoryManagement from "./Sales-ManagerPages/Sales-Pages/CategoryManagement";
 import ProductManagement from "./Sales-ManagerPages/Sales-Pages/ProductManagement";
-import WorkOrders from "./Sales-ManagerPages/Sales-Pages/WorkOrders";
+import SalesOrders from "./Sales-ManagerPages/Sales-Pages/SalesOrders";
 import ReadyToDispatch from "./Sales-ManagerPages/Sales-Pages/ReadyToDispatch";
 import DispatchOnChallan from "./Sales-ManagerPages/Sales-Pages/DispatchOnChallan";
 import DispatchOnInvoice from "./Sales-ManagerPages/Sales-Pages/DispatchOnInvoice";
@@ -20,7 +20,9 @@ import StockSummary from "./Sales-ManagerPages/Sales-Pages/StockSummary";
 import ItemsMaster from "./Sales-ManagerPages/Sales-Pages/ItemsMaster";
 import StockAlerts from "./Sales-ManagerPages/Sales-Pages/StockAlerts";
 import ReportsAnalytics from "./Sales-ManagerPages/Sales-Pages/ReportsAnalytics";
-import UploadWorkOrder from "./Sales-ManagerPages/Sales-Pages/UploadWorkOrder";
+import UploadSalesOrder from "./Sales-ManagerPages/Sales-Pages/UploadSalesOrder";
+import ViewExcelSheetData from "./Sales-ManagerPages/Sales-Pages/ViewExcelSheetData";
+import UploadPurchaseOrder from "./Sales-ManagerPages/Sales-Pages/UploadPurchaseOrder";
 
 // const App = () => {
 //   return (
@@ -88,8 +90,9 @@ const App = () => {
         <Route path="stock-summary" element={<StockSummary />} />
 
         {/* SALES ORDERS */}
-        <Route path="work-orders" element={<WorkOrders />} />
-        <Route path="work-orders/upload" element={<UploadWorkOrder />} />
+        <Route path="sales-orders" element={<SalesOrders />} />
+        <Route path="sales-orders/upload" element={<UploadSalesOrder />} />
+        <Route path="viewExcelSheet" element={<ViewExcelSheetData />} />
         <Route path="ready-to-dispatch" element={<ReadyToDispatch />} />
 
         {/* DISPATCH */}
@@ -103,6 +106,7 @@ const App = () => {
         {/* PURCHASES */}
         <Route path="purchase-orders" element={<PurchaseOrderList />} />
         <Route path="purchase-orders/create" element={<CreatePurchaseOrder />} />
+      <Route path="purchase-orders/upload" element={<UploadPurchaseOrder />} />
         <Route path="upload-vendor-invoice" element={<UploadVendorInvoice />} />
         <Route path="debit-credit-notes" element={<DebitCreditNotes />} />
         <Route path="vendor-invoice-history" element={<VendorInvoiceHistory />} />
