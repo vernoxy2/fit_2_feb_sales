@@ -223,8 +223,11 @@ export default function SalesStock() {
                         </p>
                       </div>
                       <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap">
-                        {l.date ? new Date(l.date).toLocaleDateString("en-IN") : "—"}
+                        {/* {l.date ? new Date(l.date).toLocaleDateString("en-IN") : "—"} */}
+                        <div>{l.date ? new Date(l.date).toLocaleDateString("en-IN") : "—"}</div>
+  <div>{l.date ? new Date(l.date).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : ""}</div>
                       </span>
+
                     </div>
                   ))}
                 </div>
