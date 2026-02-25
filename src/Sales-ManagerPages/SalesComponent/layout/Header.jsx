@@ -15,13 +15,14 @@ export default function Header() {
       "/sales/unbilled-challans": "Unbilled Challans",
       "/sales/invoice-history": "Invoice History",
       "/sales/purchase-orders": "Purchase Orders",
+      "/sales/sales-orders/List": "Sales Orders List",
       "/sales/upload-vendor-invoice": "Upload Vendor Invoice",
       "/sales/debit-credit-notes": "Debit/Credit Notes",
       "/sales/vendor-invoice-history": "Vendor Invoice History",
       "/sales/stock-summary": "Stock Summary",
       "/sales/items-master": "Items Master",
       "/sales/stock-alerts": "Stock Alerts",
-      "/sales/reports": "Reports & Analytics"
+      "/sales/reports": "Reports & Analytics",
     };
     return titles[location.pathname] || "Sales Module";
   };
@@ -34,7 +35,10 @@ export default function Header() {
       </div>
       <div className="flex items-center gap-3">
         <div className="relative hidden md:block">
-          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <FiSearch
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            size={16}
+          />
           <input
             type="text"
             placeholder="Search..."

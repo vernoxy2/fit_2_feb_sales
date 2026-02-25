@@ -16,6 +16,30 @@ export const CardHeader = ({ title, subtitle, action }) => (
     {action && <div>{action}</div>}
   </div>
 );
+export function FormSection({ title, children }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+      <h3 className="text-sm font-bold text-slate-800 mb-4 pb-3 border-b border-slate-100">{title}</h3>
+      <div className="space-y-4">{children}</div>
+    </div>
+  );
+}
+export function Toggle({ label, checked, onChange }) {
+  return (
+    <div className="flex items-center gap-3">
+      {label && <span className="text-xs font-bold text-slate-600">{label}</span>}
+      <button
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${checked ? "bg-indigo-600" : "bg-slate-200"}`}
+      >
+        <span className={`inline-block w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 mt-0.5 ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
+      </button>
+      {checked && <span className="text-xs font-semibold text-indigo-600">YES</span>}
+      {!checked && <span className="text-xs font-semibold text-slate-400">NO</span>}
+    </div>
+  );
+}
+
 
 export const KPICard = ({ label, value, icon: Icon, color = "indigo", trend, onClick }) => {
   const colors = {

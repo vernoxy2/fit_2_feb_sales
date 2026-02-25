@@ -23,7 +23,7 @@ export default function SalesOrder() {
         </div>
         <div className="flex gap-7">
 
-        <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors">
+        <button onClick={() => navigate("/sales/sales-orders/create")}  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors">
           <FiFileText size={14} /> Create Sales Order
         </button>
          <button onClick={() => navigate('/sales/sales-orders/upload')} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors">
@@ -51,7 +51,7 @@ export default function SalesOrder() {
           value={stats.activeWorkOrders}
           icon={FiPackage}
           color="blue"
-          onClick={() => navigate('/sales/work-orders')}
+          onClick={() => navigate('/sales/sales-orders')}
         />
         <KPICard
           label="Pending Challans"
@@ -84,14 +84,14 @@ export default function SalesOrder() {
             title="Recent Sales Orders" 
             subtitle={`${stats.activeWorkOrders} active orders`}
             action={
-              <button onClick={() => navigate('/sales/work-orders')} className="text-xs text-indigo-600 font-bold hover:text-indigo-700">
+              <button onClick={() => navigate('/sales/sales-orders')} className="text-xs text-indigo-600 font-bold hover:text-indigo-700">
                 View All →
               </button>
             }
           />
           <div className="divide-y divide-slate-50">
             {recentWorkOrders.map(wo => (
-              <div key={wo.id} className="px-6 py-4 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => navigate(`/sales/work-orders/${wo.id}`)}>
+              <div key={wo.id} className="px-6 py-4 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => navigate(`/sales/sales-orders/${wo.id}`)}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -188,7 +188,7 @@ export default function SalesOrder() {
       <Card>
         <CardHeader title="Quick Actions" />
         <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button onClick={() => navigate('/sales/ViewExcelSheetData')} className="p-4 border-2 border-dashed border-slate-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-all text-center">
+          <button onClick={() => navigate('/sales/sales-orders/upload')} className="p-4 border-2 border-dashed border-slate-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-all text-center">
             <FiPackage className="mx-auto mb-2 text-indigo-600" size={24} />
             <p className="text-xs font-bold text-slate-700">Upload Sales Order</p>
           </button>

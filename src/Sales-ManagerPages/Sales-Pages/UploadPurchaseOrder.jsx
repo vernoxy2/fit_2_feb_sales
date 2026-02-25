@@ -160,6 +160,7 @@ export default function UploadPurchaseOrder() {
       totalItems: items.length,
       hasShortage: stockAlerts.length > 0,
       createdAt: new Date().toISOString(),
+      type: "Purchase_Order"
     });
 
     setUploading(false);

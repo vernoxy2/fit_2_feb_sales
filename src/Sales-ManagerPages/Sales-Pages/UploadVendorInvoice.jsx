@@ -1,12 +1,24 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiFileText, FiCheck, FiPackage, FiAlertTriangle } from "react-icons/fi";
 import { Card, CardHeader, Input, Select, FileUpload, Textarea, BtnPrimary, BtnSecondary, Alert, Table } from "../SalesComponent/ui/index";
-import { PURCHASE_ORDERS_ENHANCED } from "../data/salesData";
+import { db } from "../../firebase";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
+
+// ── ETA calc ──────────────────────────────────────────────────────────────────
+function calcStatus(deliveryDate) {
+  if (!deliveryDate) return { status: "pending", remainingDays: 0 };
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const eta = new Date(deliveryDate); eta.setHours(0, 0, 0, 0);
+  const diff = Math.round((eta - today) / (1000 * 60 * 60 * 24));
+  if (diff < 0) return { status: "overdue", remainingDays: diff };
+  if (diff <= 2) return { status: "warning", remainingDays: diff };
+  return { status: "pending", remainingDays: diff };
+}
 
 export default function UploadVendorInvoice() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1); // 1: Select PO, 2: Upload Invoice, 3: Quality Check, 4: Confirm
+  const [step, setStep] = useState(1);
   const [selectedPO, setSelectedPO] = useState(null);
   const [invoice, setInvoice] = useState({
     vendorInvoiceNo: "",
@@ -18,7 +30,60 @@ export default function UploadVendorInvoice() {
   const [remarks, setRemarks] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  const pendingPOs = PURCHASE_ORDERS_ENHANCED.filter(po => po.status !== 'received');
+  // ── CHANGE 1: Firebase fetch instead of static data ───────────────────────
+  const [pendingPOs, setPendingPOs] = useState([]);
+  const [loadingPOs, setLoadingPOs] = useState(true);
+
+  useEffect(() => {
+    const fetchPOs = async () => {
+      try {
+        const snap = await getDocs(
+          query(collection(db, "excelupload"), orderBy("createdAt", "desc"))
+        );
+        const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+        // Only PO type, not received
+        const pos = all.filter((doc) => {
+          if (doc.type === "SALES_ORDER") return false;
+          if (doc.type !== "PO") {
+            const buyer = doc.excelHeader?.buyer;
+            if (buyer && buyer.trim() !== "") return false;
+          }
+          return !doc.receivedAt; // not already received
+        });
+
+        // Map to same shape as PURCHASE_ORDERS_ENHANCED
+        const mapped = pos.map((po) => {
+          const { status, remainingDays } = calcStatus(po.deliveryDate);
+          return {
+            id:            po.id,
+            poNumber:      po.woNumber || po.excelHeader?.voucherNo || po.id.slice(0, 8).toUpperCase(),
+            vendor:        po.customer || po.excelHeader?.supplier || po.excelHeader?.consignee || "—",
+            vendorContact: po.customerContact || "—",
+            date:          po.excelHeader?.dated || "",
+            eta:           po.deliveryDate || "—",
+            status,
+            remainingDays,
+            items:         (po.items || []).map(item => ({
+              ...item,
+              quantity: item.quantity || 0,
+              unit:     item.unit || "pcs",
+            })),
+            grandTotal:    0,
+            reason:        po.notes || "",
+          };
+        });
+
+        setPendingPOs(mapped);
+      } catch (err) {
+        console.error("Fetch error:", err);
+      } finally {
+        setLoadingPOs(false);
+      }
+    };
+    fetchPOs();
+  }, []);
+  // ─────────────────────────────────────────────────────────────────────────
 
   const handleSelectPO = (po) => {
     setSelectedPO(po);
@@ -68,7 +133,12 @@ export default function UploadVendorInvoice() {
       {step === 1 && (
         <Card>
           <CardHeader title="Select Purchase Order" subtitle={`${pendingPOs.length} POs awaiting material`} />
-          {pendingPOs.length === 0 ? (
+          {loadingPOs ? (
+            <div className="p-12 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-3" />
+              <p className="text-sm text-slate-400">Loading Purchase Orders...</p>
+            </div>
+          ) : pendingPOs.length === 0 ? (
             <div className="p-12 text-center">
               <FiFileText size={48} className="mx-auto mb-3 text-slate-300" />
               <p className="text-sm font-bold text-slate-600">No Pending Purchase Orders</p>
@@ -77,7 +147,11 @@ export default function UploadVendorInvoice() {
           ) : (
             <div className="divide-y divide-slate-50">
               {pendingPOs.map(po => (
-                <div key={po.id} className={`px-6 py-4 hover:bg-slate-50 transition-colors cursor-pointer ${po.status === 'overdue' ? 'bg-red-50' : po.status === 'warning' ? 'bg-orange-50' : ''}`} onClick={() => handleSelectPO(po)}>
+                <div
+                  key={po.id}
+                  className={`px-6 py-4 hover:bg-slate-50 transition-colors cursor-pointer ${po.status === 'overdue' ? 'bg-red-50' : po.status === 'warning' ? 'bg-orange-50' : ''}`}
+                  onClick={() => handleSelectPO(po)}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
@@ -96,7 +170,6 @@ export default function UploadVendorInvoice() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-slate-800">₹{(po.grandTotal / 1000).toFixed(0)}K</p>
                       <button className="mt-2 px-3 py-1 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700">
                         Receive Material →
                       </button>
@@ -169,8 +242,8 @@ export default function UploadVendorInvoice() {
                     value={qualityCheck}
                     onChange={(e) => setQualityCheck(e.target.value)}
                     options={[
-                      { value: "passed", label: "✓ Passed - All items good" },
-                      { value: "failed", label: "✗ Failed - Issues found" },
+                      { value: "passed",  label: "✓ Passed - All items good" },
+                      { value: "failed",  label: "✗ Failed - Issues found" },
                       { value: "partial", label: "⚠ Partial - Some issues" },
                     ]}
                   />
@@ -240,8 +313,8 @@ export default function UploadVendorInvoice() {
       {step === 2 && (
         <div className="flex justify-end gap-3">
           <BtnSecondary onClick={() => setStep(1)}>← Back</BtnSecondary>
-          <BtnPrimary 
-            onClick={() => setStep(3)} 
+          <BtnPrimary
+            onClick={() => setStep(3)}
             disabled={!invoice.vendorInvoiceNo || !invoice.file}
           >
             Next: Quality Check →
@@ -274,10 +347,11 @@ export default function UploadVendorInvoice() {
               <p>✅ Material quantities verified</p>
               <p>✅ Quality check completed: {qualityCheck}</p>
               <p>✅ Stock updated and available for use</p>
-              {getTotalShortage() > 0 && <p className="text-amber-600">⚠️ Debit note required for {getTotalShortage()} units shortage</p>}
+              {getTotalShortage() > 0 && (
+                <p className="text-amber-600">⚠️ Debit note required for {getTotalShortage()} units shortage</p>
+              )}
             </div>
 
-            {/* Stock Addition Summary */}
             <div className="max-w-2xl mx-auto mb-8">
               <Card className="bg-slate-50">
                 <div className="p-4">
@@ -295,7 +369,7 @@ export default function UploadVendorInvoice() {
             </div>
 
             <div className="flex items-center justify-center gap-3">
-              <BtnSecondary onClick={() => navigate('/sales/purchase-orders/upload-invoice')}>
+              <BtnSecondary onClick={() => { setStep(1); setSelectedPO(null); }}>
                 Upload Another
               </BtnSecondary>
               <BtnPrimary onClick={() => navigate('/sales/purchase-orders')}>
