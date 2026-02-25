@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import {
   FiHome, FiFileText, FiBell, FiTruck, FiDollarSign, FiClock,
   FiArchive, FiShoppingCart, FiUpload, FiFile, FiBarChart2,
-  FiPackage, FiAlertTriangle, FiTrendingUp, FiLayers, FiSettings
+  FiPackage, FiAlertTriangle, FiTrendingUp, FiLayers, FiSettings, FiClipboard
 } from "react-icons/fi";
 
 export default function Sidebar() {
@@ -21,9 +21,11 @@ export default function Sidebar() {
     {
       title: "SALES ORDERS",
       items: [
-        { to: "/sales/sales-orders", icon: FiFileText, label: "Sales Orders" },
+        { to: "/sales/sales-orders", icon: FiClipboard, label: "Sales Orders", end: true },
+        {to: "/sales/sales-orders/List", icon: FiFileText, label: "Sales Orders List"},
         { to: "/sales/purchase-orders/upload", icon: FiPackage, label: "Upload Sales Orders" },
         { to: "/sales/ready-to-dispatch", icon: FiBell, label: "Ready to Dispatch", badge: 2, badgeColor: "emerald" }
+
       ]
     },
     {
@@ -94,6 +96,7 @@ export default function Sidebar() {
                 <NavLink
                   key={item.to}
                   to={item.to}
+                   end={item.end}
                   className={({ isActive }) =>
                     `flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg transition-all text-sm group ${
                       isActive ? "bg-indigo-50 text-indigo-600 font-bold" : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"

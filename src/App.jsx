@@ -1,5 +1,5 @@
-import React from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import SalesLayout from "./Sales-ManagerPages/SalesComponent/layout/Layout";
 import Dashboard from "./Sales-ManagerPages/Sales-Pages/Dashboard";
 import LowStockManagement from "./Sales-ManagerPages/Sales-Pages/LowStockManagement";
@@ -23,6 +23,9 @@ import ReportsAnalytics from "./Sales-ManagerPages/Sales-Pages/ReportsAnalytics"
 import UploadSalesOrder from "./Sales-ManagerPages/Sales-Pages/UploadSalesOrder";
 import ViewExcelSheetData from "./Sales-ManagerPages/Sales-Pages/ViewExcelSheetData";
 import UploadPurchaseOrder from "./Sales-ManagerPages/Sales-Pages/UploadPurchaseOrder";
+import CreateSalesOrder from "./Sales-ManagerPages/Sales-Pages/CreateSalesOrder";
+import SalesOrderList from "./Sales-ManagerPages/Sales-Pages/SalesOrderList";
+import SalesOrderDetails from "./Sales-ManagerPages/Sales-Pages/SalesOrderDetails";
 
 // const App = () => {
 //   return (
@@ -94,6 +97,9 @@ const App = () => {
         <Route path="sales-orders/upload" element={<UploadSalesOrder />} />
         <Route path="viewExcelSheet" element={<ViewExcelSheetData />} />
         <Route path="ready-to-dispatch" element={<ReadyToDispatch />} />
+        <Route path="sales-orders/create" element={<CreateSalesOrder />} />
+        <Route path="sales-orders/list" element={<SalesOrderList />} />
+        <Route path="sales-orders/:id" element={<SalesOrderDetails />} />
 
         {/* DISPATCH */}
         <Route path="dispatch-on-challan" element={<DispatchOnChallan />} />
@@ -105,11 +111,21 @@ const App = () => {
 
         {/* PURCHASES */}
         <Route path="purchase-orders" element={<PurchaseOrderList />} />
-        <Route path="purchase-orders/create" element={<CreatePurchaseOrder />} />
-      <Route path="purchase-orders/upload" element={<UploadPurchaseOrder />} />
+        <Route
+          path="purchase-orders/create"
+          element={<CreatePurchaseOrder />}
+        />
+
+        <Route
+          path="purchase-orders/upload"
+          element={<UploadPurchaseOrder />}
+        />
         <Route path="upload-vendor-invoice" element={<UploadVendorInvoice />} />
         <Route path="debit-credit-notes" element={<DebitCreditNotes />} />
-        <Route path="vendor-invoice-history" element={<VendorInvoiceHistory />} />
+        <Route
+          path="vendor-invoice-history"
+          element={<VendorInvoiceHistory />}
+        />
 
         {/* INVENTORY */}
         <Route path="items-master" element={<ItemsMaster />} />

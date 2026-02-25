@@ -232,6 +232,7 @@ export default function UploadSalesOrder() {
         totalItems:      items.length,
         hasShortage:     alerts.length > 0,
         createdAt:       new Date().toISOString(),
+        type: "SALES_ORDER",
       });
 
       setUploading(false);
@@ -278,7 +279,7 @@ export default function UploadSalesOrder() {
       {/* ── STEP 1: Upload ── */}
       {step === 1 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
+          {/* <Card>
             <CardHeader title="Sales Order Details" />
             <div className="p-6 space-y-4">
               <Input label="WO Number" value={workOrder.woNumber} onChange={(e) => setWorkOrder({ ...workOrder, woNumber: e.target.value })} placeholder="WO-2024-001" required />
@@ -290,7 +291,7 @@ export default function UploadSalesOrder() {
                 options={[{ value: "Low", label: "Low" }, { value: "Medium", label: "Medium" }, { value: "High", label: "High" }]} />
               <Textarea label="Notes" value={workOrder.notes} onChange={(e) => setWorkOrder({ ...workOrder, notes: e.target.value })} placeholder="Any special instructions..." />
             </div>
-          </Card>
+          </Card> */}
 
           <Card>
             <CardHeader title="Upload Excel File" subtitle="Sales Order / Purchase Order Excel" />
