@@ -402,7 +402,6 @@ export default function PurchaseOrderList() {
               className="hover:bg-slate-50 transition-colors cursor-pointer"
               onClick={() => {
                 if (po.status === "complete") {
-                  // navigate(`purchase-orders/complete/${po.id}`);
                    navigate(`/sales/purchase-orders/complete/${po.id}`);
                 } else {
                   navigate(`/sales/upload-vendor-invoice?poId=${po.id}`);
