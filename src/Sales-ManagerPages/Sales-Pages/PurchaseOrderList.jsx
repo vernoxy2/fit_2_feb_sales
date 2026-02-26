@@ -44,8 +44,8 @@ export default function PurchaseOrderList() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
- 
-   const filteredPOs = poData.filter((po) => {
+
+  const filteredPOs = poData.filter((po) => {
     const matchStatus = filterStatus === "all" || po.status === filterStatus;
     const q = searchQuery.trim().toLowerCase();
     const matchSearch =
@@ -57,7 +57,7 @@ export default function PurchaseOrderList() {
       po.eta?.toLowerCase().includes(q);
     return matchStatus && matchSearch;
   });
-   const paginatedPOs = filteredPOs.slice(
+  const paginatedPOs = filteredPOs.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE,
   );
@@ -151,7 +151,6 @@ export default function PurchaseOrderList() {
   const overduePOs = poData.filter((po) => po.status === "overdue").length;
 
   // ── Filter + Search ───────────────────────────────────────────────────────
- 
 
   const urgentPOs = poData.filter(
     (po) => po.status === "warning" || po.status === "overdue",
@@ -387,12 +386,28 @@ export default function PurchaseOrderList() {
         >
           {/* {filteredPOs.slice(0, 10).map((po) => ( */}
           {paginatedPOs.map((po) => (
+            // <tr
+            //   key={po.id}
+            //   className={`hover:bg-slate-50 transition-colors ${
+            //     po.status === "complete" ? "cursor-pointer" : "cursor-default"
+            //   }`}
+            //   onClick={() => {
+            //     if (po.status === "complete") {
+            //       navigate(`/sales/purchase-orders/complete/${po.id}`);
+            //     }
+            //   }}
+            // >
             <tr
               key={po.id}
               className="hover:bg-slate-50 transition-colors cursor-pointer"
-              onClick={() =>
-                navigate(`/sales/upload-vendor-invoice?poId=${po.id}`)
-              }
+              onClick={() => {
+                if (po.status === "complete") {
+                  // navigate(`purchase-orders/complete/${po.id}`);
+                   navigate(`/sales/purchase-orders/complete/${po.id}`);
+                } else {
+                  navigate(`/sales/upload-vendor-invoice?poId=${po.id}`);
+                }
+              }}
             >
               <td className="px-5 py-4">
                 <p className="text-sm font-bold text-slate-800 font-mono">

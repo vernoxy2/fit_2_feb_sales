@@ -45,6 +45,44 @@ function calcEtaStatus(deliveryDate) {
   return { status: "ordered", remainingDays: diff };
 }
 
+function toInputDate(val) {
+  if (!val) return "";
+  const s = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy)
+    return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  // D-Mon-YY  e.g. 5-Dec-25
+  const monShort = s.match(/^(\d{1,2})[\/\-]([A-Za-z]{3})[\/\-](\d{2,4})$/);
+  if (monShort) {
+    const months = {
+      jan: "01",
+      feb: "02",
+      mar: "03",
+      apr: "04",
+      may: "05",
+      jun: "06",
+      jul: "07",
+      aug: "08",
+      sep: "09",
+      oct: "10",
+      nov: "11",
+      dec: "12",
+    };
+    const m = months[monShort[2].toLowerCase()];
+    const yr = monShort[3].length === 2 ? "20" + monShort[3] : monShort[3];
+    if (m) return `${yr}-${m}-${monShort[1].padStart(2, "0")}`;
+  }
+  // Excel serial number
+  if (/^\d{5}$/.test(s)) {
+    const d = new Date(Math.round((+s - 25569) * 86400 * 1000));
+    if (!isNaN(d)) return d.toISOString().split("T")[0];
+  }
+  const d = new Date(s);
+  if (!isNaN(d)) return d.toISOString().split("T")[0];
+  return "";
+}
 // ── Status Pill ───────────────────────────────────────────────────────────────
 function StatusPill({ status }) {
   const map = {
@@ -217,6 +255,33 @@ export default function UploadVendorInvoice() {
         const workbook = XLSX.read(data, { type: "array" });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const range = XLSX.utils.decode_range(sheet["!ref"]);
+        // const findVal = (keywords) => {
+        //   for (let row = 0; row <= Math.min(40, range.e.r); row++) {
+        //     for (let col = 0; col <= range.e.c; col++) {
+        //       const cell = sheet[XLSX.utils.encode_cell({ r: row, c: col })];
+        //       if (cell && cell.v) {
+        //         const val = String(cell.v).toLowerCase();
+        //         for (const kw of keywords) {
+        //           if (val.includes(kw.toLowerCase())) {
+        //             const right =
+        //               sheet[XLSX.utils.encode_cell({ r: row, c: col + 1 })];
+        //             const right2 =
+        //               sheet[XLSX.utils.encode_cell({ r: row, c: col + 2 })];
+        //             const below =
+        //               sheet[XLSX.utils.encode_cell({ r: row + 1, c: col })];
+        //             if (right && right.v) return String(right.v);
+        //             if (right2 && right2.v) return String(right2.v);
+        //             if (below && below.v) return String(below.v);
+        //           }
+        //         }
+        //       }
+        //     }
+        //   }
+        //   return "";
+        // };
+
+        // ── Extract invoice header ──
+
         const findVal = (keywords) => {
           for (let row = 0; row <= Math.min(40, range.e.r); row++) {
             for (let col = 0; col <= range.e.c; col++) {
@@ -227,13 +292,14 @@ export default function UploadVendorInvoice() {
                   if (val.includes(kw.toLowerCase())) {
                     const right =
                       sheet[XLSX.utils.encode_cell({ r: row, c: col + 1 })];
-                    const right2 =
-                      sheet[XLSX.utils.encode_cell({ r: row, c: col + 2 })];
                     const below =
                       sheet[XLSX.utils.encode_cell({ r: row + 1, c: col })];
+                    const right2 =
+                      sheet[XLSX.utils.encode_cell({ r: row, c: col + 2 })];
+                    // ✅ below પહેલાં check — right2 માં બીજો header આવી શકે
                     if (right && right.v) return String(right.v);
-                    if (right2 && right2.v) return String(right2.v);
                     if (below && below.v) return String(below.v);
+                    if (right2 && right2.v) return String(right2.v);
                   }
                 }
               }
@@ -241,20 +307,28 @@ export default function UploadVendorInvoice() {
           }
           return "";
         };
-
-        // ── Extract invoice header ──
         const header = {
-          invoiceNo: findVal(["Invoice No", "Invoice No.", "Bill No"]),
-          dated: findVal(["Dated", "Date"]),
+          invoiceNo: findVal([
+            "Invoice No.",
+            "Invoice No",
+            "Invoice Number",
+            "Bill No",
+          ]),
+          dated: findVal(["Dated", "Invoice Date", "Bill Date"]),
           supplierInvNo: findVal(["Supplier Invoice", "Supplier Inv"]),
-          supplier: findVal(["Supplier", "Bill from"]),
-          consignee: findVal(["Consignee", "Ship to"]),
+          supplier: findVal(["Supplier (Bill from)", "Supplier", "Bill from"]),
+          consignee: findVal(["Consignee (Ship to)", "Consignee", "Ship to"]),
           gstin: findVal(["GSTIN/UIN", "GSTIN"]),
         };
 
-        // Auto-fill invoice number from Excel
         if (header.invoiceNo) setInvoiceNo(header.invoiceNo);
-        if (header.dated) setInvoiceDate(header.dated);
+
+        // ✅ "5-Dec-25" → "2025-12-05" convert
+        if (header.dated) {
+          const converted = toInputDate(header.dated);
+          setInvoiceDate(converted || header.dated);
+        }
+
         setInvoiceHeader(header);
 
         // ── Find table start ──
@@ -1316,6 +1390,17 @@ export default function UploadVendorInvoice() {
                   Upload Remaining Invoice
                 </BtnPrimary>
               )}
+
+              {getTotalShortage() === 0 && (
+                <BtnPrimary
+                  onClick={() =>
+                    navigate(`/sales/purchase-orders/complete/${selectedPO.id}`)
+                  }
+                >
+                  View Complete Summary →
+                </BtnPrimary>
+              )}
+
               <BtnSecondary
                 onClick={() => {
                   setStep(1);
