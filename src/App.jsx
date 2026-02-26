@@ -26,6 +26,7 @@ import UploadPurchaseOrder from "./Sales-ManagerPages/Sales-Pages/UploadPurchase
 import CreateSalesOrder from "./Sales-ManagerPages/Sales-Pages/CreateSalesOrder";
 import SalesOrderList from "./Sales-ManagerPages/Sales-Pages/SalesOrderList";
 import SalesOrderDetails from "./Sales-ManagerPages/Sales-Pages/SalesOrderDetails";
+import POCompleteDetails from "./Sales-ManagerPages/Sales-Pages/POCompleteDetails";
 
 // const App = () => {
 //   return (
@@ -100,6 +101,7 @@ const App = () => {
         <Route path="sales-orders/create" element={<CreateSalesOrder />} />
         <Route path="sales-orders/list" element={<SalesOrderList />} />
         <Route path="sales-orders/:id" element={<SalesOrderDetails />} />
+        <Route path="purchase-orders/complete/:poId" element={<POCompleteDetails />} />
 
         {/* DISPATCH */}
         <Route path="dispatch-on-challan" element={<DispatchOnChallan />} />
