@@ -14,7 +14,6 @@ export default function SalesStock() {
   const [filterLow, setFilterLow]   = useState(false);
   const [ledgerItem, setLedgerItem] = useState(null);
 
-  // ── ONLY "stock" collection — real-time ───────────────────────────
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "stock"), (snapshot) => {
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -24,24 +23,22 @@ export default function SalesStock() {
     return () => unsub();
   }, []);
 
-  // ── Filtering ─────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     return stockItems.filter(s => {
       const matchSearch =
         (s.description || "").toLowerCase().includes(search.toLowerCase()) ||
         (s.productCode  || "").toLowerCase().includes(search.toLowerCase());
-      const matchLow = !filterLow || s.available < (s.minLevel || 0);
+      const matchLow = !filterLow || s.available <= 0 || s.available < (s.minLevel || 0);
       return matchSearch && matchLow;
     });
   }, [stockItems, search, filterLow]);
 
-  const lowCount      = stockItems.filter(s => s.available < (s.minLevel || 0)).length;
-  const shortageCount = stockItems.filter(s => s.available < 0).length;
+  const lowCount      = stockItems.filter(s => s.available < (s.minLevel || 0) && s.available >= 0).length;
+  const shortageCount = stockItems.filter(s => s.available <= 0).length;
+  const backorderCount = stockItems.filter(s => (s.backorder || 0) > 0).length;
 
-  
   return (
     <div className="space-y-5">
-
       <div>
         <h2 className="text-xl font-black text-slate-800 tracking-tight">Stock Management</h2>
         <p className="text-xs text-slate-400 mt-0.5">
@@ -49,9 +46,9 @@ export default function SalesStock() {
         </p>
       </div>
 
-      {/* ── Summary Cards ── */}
+      {/* Summary Cards */}
       {!loading && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div className="bg-white rounded-xl border border-slate-200 p-4">
             <p className="text-xs text-slate-400 uppercase font-bold">Total SKUs</p>
             <p className="text-2xl font-black text-slate-800 mt-1">{stockItems.length}</p>
@@ -64,10 +61,14 @@ export default function SalesStock() {
             <p className="text-xs text-orange-400 uppercase font-bold">Shortage</p>
             <p className="text-2xl font-black text-orange-600 mt-1">{shortageCount}</p>
           </div>
+          <div className="bg-white rounded-xl border border-yellow-200 p-4">
+            <p className="text-xs text-yellow-600 uppercase font-bold">Backorder</p>
+            <p className="text-2xl font-black text-yellow-600 mt-1">{backorderCount}</p>
+          </div>
         </div>
       )}
 
-      {/* ── FILTERS ── */}
+      {/* Filters */}
       <Card>
         <div className="px-5 py-4 flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-[180px] max-w-xs relative">
@@ -93,10 +94,9 @@ export default function SalesStock() {
         </div>
       </Card>
 
-      {/* ── STOCK TABLE ── */}
+      {/* Stock Table */}
       <Card>
-        <CardHeader title="All Stock Items" subtitle="PO = stock increase, WO = stock decrease" />
-
+        <CardHeader title="All Stock Items" subtitle="PO = stock increase, SO Invoice = stock decrease" />
         {loading ? (
           <div className="text-center py-16">
             <FiRefreshCw size={28} className="animate-spin mx-auto text-teal-500 mb-3" />
@@ -108,12 +108,13 @@ export default function SalesStock() {
               <thead>
                 <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                   <th className="px-5 py-3 text-left">No</th>
-                  {/* <th className="px-4 py-3 text-left">Product Code</th> */}
                   <th className="px-4 py-3 text-left">Description</th>
                   <th className="px-4 py-3 text-center">Part No.</th>
                   <th className="px-4 py-3 text-center">HSN/SAC</th>
                   <th className="px-4 py-3 text-center">Available</th>
                   <th className="px-4 py-3 text-center">Reserved</th>
+                  {/* ✅ Backorder column */}
+                  <th className="px-4 py-3 text-center">Backorder</th>
                   <th className="px-4 py-3 text-center">Unit</th>
                   <th className="px-4 py-3 text-center">Status</th>
                   <th className="px-4 py-3 text-center">Ledger</th>
@@ -121,9 +122,13 @@ export default function SalesStock() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {filtered.map((item, idx) => {
-                  const isShortage = item.available < 0;
-                  const isLow      = !isShortage && item.available < (item.minLevel || 0);
-                  const rowBg      = isShortage ? "bg-red-50/40" : isLow ? "bg-amber-50/30" : "";
+                  const avail      = Math.max(0, item.available || 0); // ✅ never negative
+                  const backorder  = item.backorder || 0;
+                  const isShortage = item.available <= 0;
+                  const isLow      = !isShortage && avail < (item.minLevel || 0);
+                  const hasBackorder = backorder > 0;
+                  const rowBg      = isShortage ? "bg-red-50/40" : hasBackorder ? "bg-yellow-50/40" : isLow ? "bg-amber-50/30" : "";
+
                   return (
                     <tr key={item.id} className={`hover:bg-slate-50/60 transition-colors ${rowBg}`}>
                       <td className="px-5 py-3.5 text-slate-400 text-xs font-semibold">{idx + 1}</td>
@@ -134,22 +139,41 @@ export default function SalesStock() {
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-center text-xs text-slate-500 font-mono">{item.hsnSac || "—"}</td>
+
+                      {/* ✅ Available - never negative */}
                       <td className="px-4 py-3.5 text-center">
-                        <span className={`font-black text-base ${isShortage ? "text-red-600" : isLow ? "text-amber-600" : "text-teal-600"}`}>
-                          {item.available}
+                        <span className={`font-black text-base ${isShortage ? "text-slate-400" : isLow ? "text-amber-600" : "text-teal-600"}`}>
+                          {avail}
                         </span>
                       </td>
+
                       <td className="px-4 py-3.5 text-center text-amber-600 font-semibold">{item.reserved || 0}</td>
+
+                      {/* ✅ Backorder - yellow highlight */}
+                      <td className="px-4 py-3.5 text-center">
+                        {hasBackorder ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-yellow-50 text-yellow-700 border border-yellow-200">
+                            +{backorder}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                      </td>
+
                       <td className="px-4 py-3.5 text-center text-xs text-slate-400 uppercase">{item.unit || "pcs"}</td>
+
                       <td className="px-4 py-3.5 text-center">
                         {isShortage ? (
                           <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2 py-1 rounded-full">SHORTAGE</span>
+                        ) : hasBackorder ? (
+                          <span className="text-[10px] font-bold bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">BACKORDER</span>
                         ) : isLow ? (
                           <span className="text-[10px] font-bold bg-amber-100 text-amber-600 px-2 py-1 rounded-full">LOW</span>
                         ) : (
                           <span className="text-[10px] font-bold bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full">OK</span>
                         )}
                       </td>
+
                       <td className="px-4 py-3.5 text-center">
                         <button
                           onClick={() => setLedgerItem(item)}
@@ -163,9 +187,9 @@ export default function SalesStock() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="text-center py-14 text-slate-400 text-sm">
+                    <td colSpan={10} className="text-center py-14 text-slate-400 text-sm">
                       {stockItems.length === 0
-                        ? "No stock data yet. Upload a PO to add stock or WO to deduct."
+                        ? "No stock data yet. Upload a PO to add stock."
                         : "No items match your search"}
                     </td>
                   </tr>
@@ -176,7 +200,7 @@ export default function SalesStock() {
         )}
       </Card>
 
-      {/* ── LEDGER MODAL ── */}
+      {/* Ledger Modal */}
       {ledgerItem && (
         <Modal
           title={`Stock Ledger — ${ledgerItem.description || ledgerItem.productCode}`}
@@ -184,18 +208,27 @@ export default function SalesStock() {
           size="lg"
         >
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               {[
-                { label: "Available", value: ledgerItem.available, color: ledgerItem.available < 0 ? "text-red-600" : "text-teal-600" },
-                { label: "Reserved",  value: ledgerItem.reserved || 0, color: "text-amber-600" },
+                { label: "Available", value: Math.max(0, ledgerItem.available || 0), color: ledgerItem.available <= 0 ? "text-red-600" : "text-teal-600" },
+                { label: "Reserved",  value: ledgerItem.reserved  || 0, color: "text-amber-600" },
+                { label: "Backorder", value: ledgerItem.backorder || 0, color: (ledgerItem.backorder || 0) > 0 ? "text-yellow-600" : "text-slate-400" },
                 { label: "Part No.",  value: ledgerItem.productCode || "—", color: "text-slate-700" },
               ].map(({ label, value, color }) => (
-                <div key={label} className="bg-slate-50 rounded-lg p-3 text-center">
+                <div key={label} className={`rounded-lg p-3 text-center ${label === "Backorder" && (ledgerItem.backorder || 0) > 0 ? "bg-yellow-50 border border-yellow-200" : "bg-slate-50"}`}>
                   <p className="text-[10px] text-slate-400 uppercase font-bold">{label}</p>
                   <p className={`text-xl font-black mt-0.5 ${color} break-all`}>{value}</p>
                 </div>
               ))}
             </div>
+
+            {/* Backorder explanation */}
+            {(ledgerItem.backorder || 0) > 0 && (
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-xs font-bold text-yellow-700">⚠️ Backorder: {ledgerItem.backorder} units</p>
+                <p className="text-xs text-yellow-600 mt-0.5">Sales order exceeded available stock. {ledgerItem.backorder} units need to be procured via PO.</p>
+              </div>
+            )}
 
             <div>
               <p className="text-xs font-bold text-slate-600 mb-2 flex items-center gap-1.5">
@@ -208,8 +241,7 @@ export default function SalesStock() {
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${l.type === "IN" ? "bg-emerald-100" : "bg-red-100"}`}>
                         {l.type === "IN"
                           ? <FiArrowDown size={13} className="text-emerald-600" />
-                          : <FiArrowUp   size={13} className="text-red-600" />
-                        }
+                          : <FiArrowUp   size={13} className="text-red-600" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
@@ -219,15 +251,13 @@ export default function SalesStock() {
                           <span className="text-[10px] text-slate-400">· Ref: {l.ref || "—"}</span>
                         </div>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                          Balance: <span className="font-bold">{l.balance}</span> · By: {l.by || "—"}
+                          Balance: <span className="font-bold">{Math.max(0, l.balance)}</span> · By: {l.by || "—"}
                         </p>
                       </div>
                       <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap">
-                        {/* {l.date ? new Date(l.date).toLocaleDateString("en-IN") : "—"} */}
                         <div>{l.date ? new Date(l.date).toLocaleDateString("en-IN") : "—"}</div>
-  <div>{l.date ? new Date(l.date).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : ""}</div>
+                        <div>{l.date ? new Date(l.date).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : ""}</div>
                       </span>
-
                     </div>
                   ))}
                 </div>

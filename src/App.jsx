@@ -27,55 +27,9 @@ import CreateSalesOrder from "./Sales-ManagerPages/Sales-Pages/CreateSalesOrder"
 import SalesOrderList from "./Sales-ManagerPages/Sales-Pages/SalesOrderList";
 import SalesOrderDetails from "./Sales-ManagerPages/Sales-Pages/SalesOrderDetails";
 import POCompleteDetails from "./Sales-ManagerPages/Sales-Pages/POCompleteDetails";
+import UploadSalesInvoice from "./Sales-ManagerPages/Sales-Pages/UploadSalesInvoice";
+import SOCompleteDetails from "./Sales-ManagerPages/Sales-Pages/SOCompleteDetails";
 
-// const App = () => {
-//   return (
-//     <Routes>
-//       <Route element={<SalesLayout />}>
-//         <Route index element={<Navigate to="dashboard" replace />} />
-
-//         {/* Dashboard */}
-//         <Route path="dashboard" element={<Dashboard />} />
-
-//         {/* STOCK MANAGEMENT */}
-//         <Route path="low-stock-management" element={<LowStockManagement />} />
-//         <Route path="category-management" element={<CategoryManagement />} />
-//         <Route path="product-management" element={<ProductManagement />} />
-//         <Route path="stock-summary" element={<StockSummary />} />
-
-//         {/* SALES ORDERS */}
-//         <Route path="work-orders" element={<WorkOrders />} />
-//         <Route path="work-orders/upload" element={<UploadWorkOrder />} />
-//         <Route path="ready-to-dispatch" element={<ReadyToDispatch />} />
-
-//         {/* DISPATCH */}
-//         <Route path="dispatch-on-challan" element={<DispatchOnChallan />} />
-//         <Route path="dispatch-on-invoice" element={<DispatchOnInvoice />} />
-
-//         {/* INVOICING */}
-//         <Route path="unbilled-challans" element={<UnbilledChallans />} />
-//         <Route path="invoice-history" element={<InvoiceHistory />} />
-
-//         {/* PURCHASES */}
-//         <Route path="purchase-orders" element={<PurchaseOrderList />} />
-//         <Route path="purchase-orders/create" element={<CreatePurchaseOrder />} />
-//         <Route path="upload-vendor-invoice" element={<UploadVendorInvoice />} />
-//         <Route path="debit-credit-notes" element={<DebitCreditNotes />} />
-//         <Route path="vendor-invoice-history" element={<VendorInvoiceHistory />} />
-
-//         {/* INVENTORY */}
-//         <Route path="items-master" element={<ItemsMaster />} />
-//         <Route path="stock-alerts" element={<StockAlerts />} />
-
-//         {/* REPORTS */}
-//         <Route path="reports" element={<ReportsAnalytics />} />
-
-//         {/* Catch all */}
-//         <Route path="*" element={<Navigate to="dashboard" replace />} />
-//       </Route>
-//     </Routes>
-//   );
-// };
 
 const App = () => {
   return (
@@ -83,10 +37,8 @@ const App = () => {
       {/* ✅ Yahan /sales/* add kiya */}
       <Route path="/sales/*" element={<SalesLayout />}>
         <Route index element={<Navigate to="dashboard" replace />} />
-
         {/* Dashboard */}
         <Route path="dashboard" element={<Dashboard />} />
-
         {/* STOCK MANAGEMENT */}
         <Route path="low-stock-management" element={<LowStockManagement />} />
         <Route path="category-management" element={<CategoryManagement />} />
@@ -101,7 +53,14 @@ const App = () => {
         <Route path="sales-orders/create" element={<CreateSalesOrder />} />
         <Route path="sales-orders/list" element={<SalesOrderList />} />
         <Route path="sales-orders/:id" element={<SalesOrderDetails />} />
-        <Route path="purchase-orders/complete/:poId" element={<POCompleteDetails />} />
+        <Route
+          path="purchase-orders/complete/:poId"
+          element={<POCompleteDetails />}
+        />
+        <Route
+          path="sales-orders/complete/:soId"
+          element={<SOCompleteDetails />}
+        />
 
         {/* DISPATCH */}
         <Route path="dispatch-on-challan" element={<DispatchOnChallan />} />
@@ -123,6 +82,7 @@ const App = () => {
           element={<UploadPurchaseOrder />}
         />
         <Route path="upload-vendor-invoice" element={<UploadVendorInvoice />} />
+        <Route path="upload-sales-invoice" element={<UploadSalesInvoice />} />
         <Route path="debit-credit-notes" element={<DebitCreditNotes />} />
         <Route
           path="vendor-invoice-history"
