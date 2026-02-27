@@ -19,22 +19,21 @@ export default function Sidebar() {
       ]
     },
     {
-      title: "SALES ORDERS",
+      title: "Outward",
       items: [
         { to: "/sales/sales-orders", icon: FiClipboard, label: "Sales Orders", end: true },
         {to: "/sales/sales-orders/List", icon: FiFileText, label: "Sales Orders List"},
         { to: "/sales/purchase-orders/upload", icon: FiPackage, label: "Upload Sales Orders" },
-        { to: "/sales/ready-to-dispatch", icon: FiBell, label: "Ready to Dispatch", badge: 2, badgeColor: "emerald" }
-
-      ]
-    },
-    {
-      title: "DISPATCH",
-      items: [
+        { to: "/sales/ready-to-dispatch", icon: FiBell, label: "Ready to Dispatch", badge: 2, badgeColor: "emerald" },
         { to: "/sales/dispatch-on-challan", icon: FiTruck, label: "Dispatch on Challan" },
-        { to: "/sales/dispatch-on-invoice", icon: FiDollarSign, label: "Dispatch on Invoice" }
       ]
     },
+    // {
+    //   title: "DISPATCH",
+    //   items: [
+    //     { to: "/sales/dispatch-on-invoice", icon: FiDollarSign, label: "Dispatch on Invoice" }
+    //   ]
+    // },
     {
       title: "INVOICING",
       items: [
@@ -43,7 +42,7 @@ export default function Sidebar() {
       ]
     },
     {
-      title: "PURCHASES",
+      title: "Inward",
       items: [
         { to: "/sales/purchase-orders", icon: FiShoppingCart, label: "Purchase Orders", badge: "2d", badgeColor: "orange" },
         { to: "/sales/upload-vendor-invoice", icon: FiUpload, label: "Upload Vendor Invoice" },
