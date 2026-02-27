@@ -30,6 +30,7 @@ import POCompleteDetails from "./Sales-ManagerPages/Sales-Pages/POCompleteDetail
 import UploadSalesInvoice from "./Sales-ManagerPages/Sales-Pages/UploadSalesInvoice";
 import SOCompleteDetails from "./Sales-ManagerPages/Sales-Pages/SOCompleteDetails";
 
+
 const App = () => {
   return (
     <Routes>
