@@ -29,6 +29,7 @@ import SalesOrderDetails from "./Sales-ManagerPages/Sales-Pages/SalesOrderDetail
 import POCompleteDetails from "./Sales-ManagerPages/Sales-Pages/POCompleteDetails";
 // import UploadSalesInvoice from "./Sales-ManagerPages/Sales-Pages/UploadSalesInvoice";
 import SOCompleteDetails from "./Sales-ManagerPages/Sales-Pages/SOCompleteDetails";
+import UploadSalesInvoice from "./Sales-ManagerPages/Sales-Pages/UploadSalesInvoice";
 
 
 const App = () => {
@@ -82,7 +83,7 @@ const App = () => {
           element={<UploadPurchaseOrder />}
         />
         <Route path="upload-vendor-invoice" element={<UploadVendorInvoice />} />
-        {/* <Route path="upload-sales-invoice" element={<UploadSalesInvoice />} /> */}
+        <Route path="upload-sales-invoice" element={<UploadSalesInvoice />} />
         <Route path="debit-credit-notes" element={<DebitCreditNotes />} />
         <Route
           path="vendor-invoice-history"
