@@ -24,7 +24,7 @@ export default function Sidebar() {
         { to: "/sales/sales-orders", icon: FiClipboard, label: "Sales Orders", end: true },
         // { to: "/sales/sales-orders/upload", icon: FiPackage, label: "Upload Sales Orders" },
         {to: "/sales/sales-orders/List", icon: FiFileText, label: "Sales Orders List"},
-        {to:"/sales/upload-vendor-invoice", icon:FiUpload, label:"Upload Vendor Invoice"},
+        {to:"/sales/upload-sales-invoice", icon:FiUpload, label:"Upload Sales Invoice"},
         { to: "/sales/ready-to-dispatch", icon: FiBell, label: "Ready to Dispatch", badge: 2, badgeColor: "emerald" },
         { to: "/sales/dispatch-on-challan", icon: FiTruck, label: "Dispatch on Challan" },
       ]

@@ -337,7 +337,7 @@ export default function UploadSalesInvoice() {
         const sos = all.filter((doc) => {
           if (doc.type !== "SALES_ORDER") return false;
           if (doc.soStatus === "complete") return false;
-           if (doc.soStatus === "excess") return false;
+        //    if (doc.soStatus === "excess") return false;
           return true;
         });
         const mapped = sos.map((so) => ({
