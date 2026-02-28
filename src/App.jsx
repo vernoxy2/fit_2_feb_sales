@@ -27,7 +27,7 @@ import CreateSalesOrder from "./Sales-ManagerPages/Sales-Pages/CreateSalesOrder"
 import SalesOrderList from "./Sales-ManagerPages/Sales-Pages/SalesOrderList";
 import SalesOrderDetails from "./Sales-ManagerPages/Sales-Pages/SalesOrderDetails";
 import POCompleteDetails from "./Sales-ManagerPages/Sales-Pages/POCompleteDetails";
-import UploadSalesInvoice from "./Sales-ManagerPages/Sales-Pages/UploadSalesInvoice";
+// import UploadSalesInvoice from "./Sales-ManagerPages/Sales-Pages/UploadSalesInvoice";
 import SOCompleteDetails from "./Sales-ManagerPages/Sales-Pages/SOCompleteDetails";
 
 
@@ -82,7 +82,7 @@ const App = () => {
           element={<UploadPurchaseOrder />}
         />
         <Route path="upload-vendor-invoice" element={<UploadVendorInvoice />} />
-        <Route path="upload-sales-invoice" element={<UploadSalesInvoice />} />
+        {/* <Route path="upload-sales-invoice" element={<UploadSalesInvoice />} /> */}
         <Route path="debit-credit-notes" element={<DebitCreditNotes />} />
         <Route
           path="vendor-invoice-history"
