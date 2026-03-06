@@ -18,7 +18,7 @@ import PPPIPES from "../../assets/DashboardImgs/PPPIPES.svg";
 import PPCHPIPES from "../../assets/DashboardImgs/PPCHPIPES.svg";
 import PPHPIPE from "../../assets/DashboardImgs/PPHPIPE.svg";
 import PPRCTPIPE from "../../assets/DashboardImgs/PPRCTPIPE.svg";
-import THERMALPIPES from "../../assets/Dashboardimgs/THERMALPIPES.svg";
+import THERMALPIPES from "../../assets/DashboardImgs/THERMALPIPES.svg";
 import PPFITTINGS from "../../assets/DashboardImgs/PPFITTINGS.svg";
 import PPCHFITTINGS from "../../assets/Dashboardimgs/PPCHFITTINGS.svg";
 import PPRCTFITTINGS from "../../assets/DashboardImgs/PPRCTFITTINGS.svg";
