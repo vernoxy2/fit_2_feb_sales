@@ -14,27 +14,27 @@ import {
 } from "react-icons/fi";
 import { db } from "../../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
-import PPPIPES from "../../assets/Dashboardimgs/PPPIPES.svg";
-import PPCHPIPES from "../../assets/Dashboardimgs/PPCHPIPES.svg";
+import PPPIPES from "../../assets/DashboardImgs/PPPIPES.svg";
+import PPCHPIPES from "../../assets/DashboardImgs/PPCHPIPES.svg";
 import PPHPIPE from "../../assets/DashboardImgs/PPHPIPE.svg";
-import PPRCTPIPE from "../../assets/Dashboardimgs/PPRCTPIPE.svg";
+import PPRCTPIPE from "../../assets/DashboardImgs/PPRCTPIPE.svg";
 import THERMALPIPES from "../../assets/Dashboardimgs/THERMALPIPES.svg";
-import PPFITTINGS from "../../assets/Dashboardimgs/PPFITTINGS.svg";
+import PPFITTINGS from "../../assets/DashboardImgs/PPFITTINGS.svg";
 import PPCHFITTINGS from "../../assets/Dashboardimgs/PPCHFITTINGS.svg";
-import PPRCTFITTINGS from "../../assets/Dashboardimgs/PPRCTFITTINGS.svg";
-import PPRCValve from "../../assets/Dashboardimgs/PPRCValve.svg";
-import VALVES from "../../assets/Dashboardimgs/VALVES.svg";
-import Channel from "../../assets/Dashboardimgs/Channel.svg";
-import FRP from "../../assets/Dashboardimgs/FRP.svg";
-import FRPMATERIAL from "../../assets/Dashboardimgs/FRPMATERIAL.svg";
+import PPRCTFITTINGS from "../../assets/DashboardImgs/PPRCTFITTINGS.svg";
+import PPRCValve from "../../assets/DashboardImgs/PPRCValve.svg";
+import VALVES from "../../assets/DashboardImgs/VALVES.svg";
+import Channel from "../../assets/DashboardImgs/Channel.svg";
+import FRP from "../../assets/DashboardImgs/FRP.svg";
+import FRPMATERIAL from "../../assets/DashboardImgs/FRPMATERIAL.svg";
 import GRIDERCLAMP from "../../assets/DashboardImgs/GRIDERCLAMP.svg";
 import HARDWARE from "../../assets/DashboardImgs/HARDWARE.svg";
-import HDPE from "../../assets/Dashboardimgs/HDPE.svg";
-import INSULATION from "../../assets/Dashboardimgs/INSULATION.svg";
-import MSFLANGES from "../../assets/Dashboardimgs/MSFLANGES.svg";
-import MACHINE from "../../assets/Dashboardimgs/MACHINE.svg";
-import OTHERITEMS from "../../assets/Dashboardimgs/OTHERITEMS.svg";
-import UPVCPVC from "../../assets/Dashboardimgs/UPVCPVC.svg";
+import HDPE from "../../assets/DashboardImgs/HDPE.svg";
+import INSULATION from "../../assets/DashboardImgs/INSULATION.svg";
+import MSFLANGES from "../../assets/DashboardImgs/MSFLANGES.svg";
+import MACHINE from "../../assets/DashboardImgs/MACHINE.svg";
+import OTHERITEMS from "../../assets/DashboardImgs/OTHERITEMS.svg";
+import UPVCPVC from "../../assets/DashboardImgs/UPVCPVC.svg";
 
 // ── Icon lookup ───────────────────────────────────────────────────────────────
 
