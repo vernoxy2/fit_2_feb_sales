@@ -2,13 +2,11 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FiPackage, FiTruck, FiFileText, FiShoppingCart,
-  FiAlertTriangle, FiClock
+  FiAlertTriangle, FiClock, FiShield, FiCheckCircle
 } from "react-icons/fi";
 import { KPICard, Card, CardHeader, Alert, StatusBadge } from "../SalesComponent/ui/index";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../firebase";
-
-// ─── Date Helpers ─────────────────────────────────────────────────────────────
 
 function parseDate(dateStr) {
   if (!dateStr) return null;
@@ -56,7 +54,27 @@ function isSalesOrder(type) {
   return ["salesorder", "so", "workorder", "wo", "sales", "sales_order"].includes(t);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ✅ Status badge with waiting_for_qc + ready_for_dispatch support
+function SoStatusChip({ status }) {
+  const map = {
+    active:              "bg-blue-100 text-blue-700 border-blue-200",
+    waiting_for_qc:      "bg-violet-100 text-violet-700 border-violet-200",
+    ready_for_dispatch:  "bg-emerald-100 text-emerald-700 border-emerald-200",
+    complete:            "bg-slate-100 text-slate-600 border-slate-200",
+  };
+  const label = {
+    active:              "Active",
+    waiting_for_qc:      "Waiting for QC",
+    ready_for_dispatch:  "Ready for Dispatch",
+    complete:            "Complete",
+  };
+  const s = status || "active";
+  return (
+    <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full border uppercase ${map[s] || map.active}`}>
+      {label[s] || s.replace(/_/g, " ")}
+    </span>
+  );
+}
 
 export default function SalesOrder() {
   const navigate = useNavigate();
@@ -83,7 +101,6 @@ export default function SalesOrder() {
           const d = doc.data();
           const header = d.excelHeader || d.invoiceHeader || {};
           const deliveryRaw = d.deliveryDate || header.dated || d.eta || "";
-
           return {
             id: doc.id,
             type: d.type || "",
@@ -103,9 +120,16 @@ export default function SalesOrder() {
           };
         });
 
+        // ✅ Map soStatus to display status — all 4 stages
         const salesOrders = allDocs
           .filter((d) => isSalesOrder(d.type))
-          .map((so) => ({ ...so, status: so.soStatus === "complete" ? "complete" : "active" }));
+          .map((so) => ({
+            ...so,
+            status: so.soStatus === "complete"            ? "complete"
+                  : so.soStatus === "waiting_for_qc"      ? "waiting_for_qc"
+                  : so.soStatus === "ready_for_dispatch"   ? "ready_for_dispatch"
+                  : "active",
+          }));
 
         const poOrders = allDocs
           .filter((d) => isPO(d.type))
@@ -127,19 +151,18 @@ export default function SalesOrder() {
     fetchData();
   }, []);
 
-  // ─── Derived ─────────────────────────────────────────────────────────────
-
-  const recentWorkOrders = workOrders.slice(0, 3);
-  const recentPOs = purchaseOrders.slice(0, 5);
+  const recentWorkOrders = workOrders.slice(0, 5);
 
   const stats = {
-    activeWorkOrders: workOrders.filter((wo) => wo.soStatus !== "complete").length,
-    pendingChallans: challans.filter((ch) => !ch.invoiceUrl && !ch.invoiceNumber).length,
-    totalPOs: purchaseOrders.length,
-    overduePOs: purchaseOrders.filter((po) => po.status === "overdue").length,
-    warningPOs: purchaseOrders.filter((po) => po.status === "warning").length,
-    completedPOs: purchaseOrders.filter((po) => po.status === "complete").length,
-    pendingInvoices: challans.filter((ch) => !ch.invoiceUrl && !ch.invoiceNumber).length,
+    activeWorkOrders:    workOrders.filter((wo) => wo.soStatus !== "complete").length,
+    waitingQC:           workOrders.filter((wo) => wo.soStatus === "waiting_for_qc").length,
+    readyForDispatch:    workOrders.filter((wo) => wo.soStatus === "ready_for_dispatch").length,
+    pendingChallans:     challans.filter((ch) => !ch.invoiceUrl && !ch.invoiceNumber).length,
+    totalPOs:            purchaseOrders.length,
+    overduePOs:          purchaseOrders.filter((po) => po.status === "overdue").length,
+    warningPOs:          purchaseOrders.filter((po) => po.status === "warning").length,
+    completedPOs:        purchaseOrders.filter((po) => po.status === "complete").length,
+    pendingInvoices:     challans.filter((ch) => !ch.invoiceUrl && !ch.invoiceNumber).length,
   };
 
   if (loading) {
@@ -178,7 +201,7 @@ export default function SalesOrder() {
         </div>
       </div>
 
-      {/* Critical Alerts Banner */}
+      {/* Alerts */}
       {showAlerts && (stats.overduePOs > 0 || stats.warningPOs > 0) && (
         <Alert type="warning" onClose={() => setShowAlerts(false)}>
           <div className="space-y-1">
@@ -190,169 +213,102 @@ export default function SalesOrder() {
         </Alert>
       )}
 
+      {/* ✅ SO Status Pipeline Banner */}
+      {(stats.waitingQC > 0 || stats.readyForDispatch > 0) && (
+        <div className="grid grid-cols-2 gap-4">
+          {stats.waitingQC > 0 && (
+            <div className="flex items-center gap-4 p-4 bg-violet-50 border border-violet-200 rounded-xl">
+              <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+                <FiShield size={20} className="text-violet-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-black text-violet-800">{stats.waitingQC} SO(s) Waiting for QC</p>
+                <p className="text-xs text-violet-600 mt-0.5">Store team needs to verify quality</p>
+              </div>
+            </div>
+          )}
+          {stats.readyForDispatch > 0 && (
+            <div className="flex items-center gap-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                <FiCheckCircle size={20} className="text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-black text-emerald-800">{stats.readyForDispatch} SO(s) Ready for Dispatch</p>
+                <p className="text-xs text-emerald-600 mt-0.5">QC approved — dispatch now</p>
+              </div>
+              <button
+                onClick={() => navigate("/sales/dispatch-on-challan")}
+                className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700"
+              >
+                Dispatch →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard
-          label="Active Work Orders"
-          value={stats.activeWorkOrders}
-          icon={FiPackage}
-          color="blue"
-          onClick={() => navigate("/sales/sales-orders/list")}
-        />
-        <KPICard
-          label="Pending Challans"
-          value={stats.pendingChallans}
-          icon={FiTruck}
-          color="purple"
-          onClick={() => navigate("/sales/unbilled-challans")}
-        />
-        <KPICard
-          label="Total Purchase Orders"
-          value={stats.totalPOs}
-          icon={FiShoppingCart}
-          color="indigo"
-          onClick={() => navigate("/sales/purchase-orders")}
-        />
-        <KPICard
-          label="Overdue POs"
-          value={stats.overduePOs}
-          icon={FiAlertTriangle}
-          color="red"
-          onClick={() => navigate("/sales/purchase-orders")}
-        />
+        <KPICard label="Active Work Orders" value={stats.activeWorkOrders} icon={FiPackage} color="blue" onClick={() => navigate("/sales/sales-orders/list")} />
+        <KPICard label="Pending Challans" value={stats.pendingChallans} icon={FiTruck} color="purple" onClick={() => navigate("/sales/unbilled-challans")} />
+        <KPICard label="Total Purchase Orders" value={stats.totalPOs} icon={FiShoppingCart} color="indigo" onClick={() => navigate("/sales/purchase-orders")} />
+        <KPICard label="Overdue POs" value={stats.overduePOs} icon={FiAlertTriangle} color="red" onClick={() => navigate("/sales/purchase-orders")} />
       </div>
 
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-1  gap-6">
-
-        {/* Recent Sales Orders */}
-        <Card>
-          <CardHeader
-            title="Recent Sales Orders"
-            subtitle={`${stats.activeWorkOrders} active orders`}
-            action={
-              <button onClick={() => navigate("/sales/sales-orders/list")} className="text-xs text-indigo-600 font-bold hover:text-indigo-700">
-                View All →
-              </button>
-            }
-          />
-          <div className="divide-y divide-slate-50">
-            {recentWorkOrders.length === 0 ? (
-              <div className="px-6 py-8 text-center">
-                <p className="text-sm text-slate-400">No sales orders found.</p>
-              </div>
-            ) : (
-              recentWorkOrders.map((wo) => (
-                <div
-                  key={wo.id}
-                  className="px-6 py-4 hover:bg-slate-50 transition-colors cursor-pointer"
-                  onClick={() => navigate("/sales/sales-orders/list")}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-sm font-bold text-slate-800">{wo.woNumber}</p>
-                        <StatusBadge status={wo.status} />
-                      </div>
-                      <p className="text-xs text-slate-600">{wo.customer}</p>
-                      <p className="text-xs text-slate-400 mt-1">Delivery: {wo.deliveryDate}</p>
+      {/* Recent Sales Orders */}
+      <Card>
+        <CardHeader
+          title="Recent Sales Orders"
+          subtitle={`${stats.activeWorkOrders} active orders`}
+          action={<button onClick={() => navigate("/sales/sales-orders/list")} className="text-xs text-indigo-600 font-bold hover:text-indigo-700">View All →</button>}
+        />
+        <div className="divide-y divide-slate-50">
+          {recentWorkOrders.length === 0 ? (
+            <div className="px-6 py-8 text-center">
+              <p className="text-sm text-slate-400">No sales orders found.</p>
+            </div>
+          ) : (
+            recentWorkOrders.map((wo) => (
+              <div
+                key={wo.id}
+                className={`px-6 py-4 hover:bg-slate-50 transition-colors cursor-pointer ${
+                  wo.status === "ready_for_dispatch" ? "bg-emerald-50/40" :
+                  wo.status === "waiting_for_qc" ? "bg-violet-50/40" : ""
+                }`}
+                onClick={() => navigate("/sales/sales-orders/list")}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-sm font-bold text-slate-800">{wo.woNumber}</p>
+                      <SoStatusChip status={wo.status} />
                     </div>
-                    {/* <div className="text-right">
-                      <p className="text-sm font-bold text-slate-800">₹{(wo.totalValue / 1000).toFixed(0)}K</p>
-                      <p className="text-xs text-slate-400">{wo.items.length} items</p>
-                    </div> */}
+                    <p className="text-xs text-slate-600">{wo.customer}</p>
+                    <p className="text-xs text-slate-400 mt-1">Delivery: {wo.deliveryDate}</p>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        </Card>
-
-        {/* Purchase Orders */}
-        {/* <Card> */}
-          {/* <CardHeader
-            title="Purchase Orders"
-            subtitle={`${stats.totalPOs} total · ${stats.completedPOs} completed`}
-            action={
-              <button onClick={() => navigate("/sales/purchase-orders")} className="text-xs text-indigo-600 font-bold hover:text-indigo-700">
-                View All →
-              </button>
-            }
-          /> */}
-          {/* <div className="divide-y divide-slate-50">
-            {recentPOs.length === 0 ? (
-              <div className="px-6 py-8 text-center">
-                <p className="text-sm text-slate-400">No purchase orders found.</p>
               </div>
-            ) : (
-              recentPOs.map((po) => (
-                <div
-                  key={po.id}
-                  className={`px-6 py-4 hover:bg-slate-50 transition-colors cursor-pointer ${
-                    po.status === "overdue" ? "bg-red-50"
-                    : po.status === "warning" ? "bg-orange-50"
-                    : po.status === "complete" ? "bg-green-50"
-                    : ""
-                  }`}
-                  onClick={() => navigate("/sales/purchase-orders")}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-sm font-bold text-slate-800">{po.poNumber}</p>
-                        <StatusBadge status={po.status} />
-                      </div>
-                      <p className="text-xs text-slate-600">{po.vendor}</p>
-                      <div className="flex items-center gap-1 mt-1">
-                        <FiClock size={10} className="text-slate-400" />
-                        <p className="text-xs text-slate-400">
-                          {po.status === "complete"
-                            ? "Completed ✓"
-                            : po.status === "overdue"
-                            ? `Overdue by ${Math.abs(po.remainingDays)} days`
-                            : po.remainingDays !== null
-                            ? `${po.remainingDays} days remaining`
-                            : "ETA not set"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div> */}
-        {/* </Card> */}
-      </div>
+            ))
+          )}
+        </div>
+      </Card>
 
       {/* Quick Actions */}
       <Card>
         <CardHeader title="Quick Actions" />
         <div className="p-6 grid grid-cols-2 md:grid-cols-3 gap-4">
-          <button
-            onClick={() => navigate("/sales/sales-orders/upload")}
-            className="p-4 border-2 border-dashed border-slate-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-all text-center"
-          >
+          <button onClick={() => navigate("/sales/sales-orders/upload")}
+            className="p-4 border-2 border-dashed border-slate-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-all text-center">
             <FiPackage className="mx-auto mb-2 text-indigo-600" size={24} />
             <p className="text-xs font-bold text-slate-700">Upload Sales Order</p>
           </button>
-          <button
-            onClick={() => navigate("/sales/dispatch-on-challan")}
-            className="p-4 border-2 border-dashed border-slate-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-all text-center"
-          >
+          <button onClick={() => navigate("/sales/dispatch-on-challan")}
+            className="p-4 border-2 border-dashed border-slate-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-all text-center">
             <FiTruck className="mx-auto mb-2 text-purple-600" size={24} />
             <p className="text-xs font-bold text-slate-700">Dispatch on Challan</p>
           </button>
-          {/* <button
-            onClick={() => navigate("/sales/purchase-orders/create")}
-            className="p-4 border-2 border-dashed border-slate-200 rounded-lg hover:border-emerald-300 hover:bg-emerald-50 transition-all text-center"
-          >
-            <FiShoppingCart className="mx-auto mb-2 text-emerald-600" size={24} />
-            <p className="text-xs font-bold text-slate-700">Create PO</p>
-          </button> */}
-          <button
-            onClick={() => navigate("/sales/upload-sales-invoice")}
-            className="p-4 border-2 border-dashed border-slate-200 rounded-lg hover:border-amber-300 hover:bg-amber-50 transition-all text-center"
-          >
+          <button onClick={() => navigate("/sales/upload-sales-invoice")}
+            className="p-4 border-2 border-dashed border-slate-200 rounded-lg hover:border-amber-300 hover:bg-amber-50 transition-all text-center">
             <FiFileText className="mx-auto mb-2 text-amber-600" size={24} />
             <p className="text-xs font-bold text-slate-700">Upload Invoice</p>
           </button>

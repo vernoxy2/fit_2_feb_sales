@@ -156,37 +156,70 @@ function EditPOPage({ poId, onDone }) {
               {items.length} items
             </p>
           </div>
-          <div className="p-6">
-            <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-4">
-              Header Information
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "COMPANYNAME", val: excelHeader.companyName },
-                { label: "ADDRESS", val: excelHeader.address },
-                { label: "GSTIN", val: excelHeader.gstin },
-                { label: "STATE", val: excelHeader.state },
-                { label: "EMAIL", val: excelHeader.email },
-                { label: "VOUCHERNO", val: excelHeader.voucherNo },
-                { label: "DATED", val: excelHeader.dated },
-                { label: "PAYMENTTERMS", val: excelHeader.paymentTerms },
-                { label: "CONSIGNEE", val: excelHeader.consignee },
-                { label: "REFERENCE", val: excelHeader.reference },
-              ]
-                .filter((f) => f.val)
-                .map(({ label, val }) => (
-                  <div
-                    key={label}
-                    className="bg-slate-50 p-3 rounded-lg border border-slate-100"
-                  >
-                    <p className="text-xs text-slate-400 uppercase font-semibold mb-1">
-                      {label}
-                    </p>
-                    <p className="text-sm font-medium text-slate-800">{val}</p>
-                  </div>
-                ))}
+          <div className="p-6 space-y-6">
+            {/* Company Info */}
+            <div>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-3">
+                Company Information
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "COMPANY NAME", val: excelHeader.companyName },
+                  { label: "ADDRESS", val: excelHeader.address },
+                  { label: "GSTIN", val: excelHeader.gstin },
+                  { label: "STATE", val: excelHeader.state },
+                  { label: "EMAIL", val: excelHeader.email },
+                  { label: "VOUCHERNO", val: excelHeader.voucherNo },
+                  { label: "DATED", val: excelHeader.dated },
+                  { label: "PAYMENT TERMS", val: excelHeader.paymentTerms },
+                  { label: "CONSIGNEE", val: excelHeader.consignee },
+                  { label: "REFERENCE", val: excelHeader.reference },
+                ]
+                  .filter((f) => f.val)
+                  .map(({ label, val }) => (
+                    <div
+                      key={label}
+                      className="bg-slate-50 p-3 rounded-lg border border-slate-100"
+                    >
+                      <p className="text-xs text-slate-400 uppercase font-semibold mb-1">
+                        {label}
+                      </p>
+                      <p className="text-sm font-medium text-slate-800">{val}</p>
+                    </div>
+                  ))}
+              </div>
             </div>
-            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+
+            {/* Party / Supplier Info */}
+            {(excelHeader.supplier || excelHeader.partyGstin || excelHeader.partyAddress) && (
+              <div>
+                <p className="text-xs font-black text-emerald-600 uppercase tracking-wide mb-3">
+                  Supplier / Party Information
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: "SUPPLIER NAME", val: excelHeader.supplier },
+                    { label: "PARTY ADDRESS", val: excelHeader.partyAddress },
+                    { label: "PARTY GSTIN", val: excelHeader.partyGstin },
+                    { label: "PARTY STATE", val: excelHeader.partyState },
+                  ]
+                    .filter((f) => f.val)
+                    .map(({ label, val }) => (
+                      <div
+                        key={label}
+                        className="bg-white p-3 rounded-lg border border-emerald-300"
+                      >
+                        <p className="text-xs text-emerald-600 uppercase font-semibold mb-1">
+                          {label}
+                        </p>
+                        <p className="text-sm font-medium text-slate-800">{val}</p>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
               <p className="text-xs font-bold text-amber-700">
                 ✏️ Edit Mode — Only quantities can be modified below
               </p>
@@ -389,12 +422,6 @@ export default function UploadPurchaseOrder() {
           return "";
         };
 
-        // ── Exact field extraction based on confirmed Excel layout ──
-        // Col A = labels/values (left section)
-        // Col F = right-section labels + values
-        // Col H = far-right labels + values
-
-        const invoiceToRow = findRow("Invoice To");
         const voucherRow = findRow("Voucher No.");
         const voucherCol = findCol("Voucher No.");
         const datesRow = findRow("Dates");
@@ -407,39 +434,25 @@ export default function UploadPurchaseOrder() {
         const consigneeCol = findCol("Consignee (Ship to)");
         const supplierRow = findRow("Supplier (Bill from)");
         const supplierCol = findCol("Supplier (Bill from)");
-        const gstin1Row = findRow("GSTIN/UIN: 24"); // first GSTIN (our company) - has value in same cell
-        const msmeRow = findRow("MSME NO:");
+        const invoiceToRow = findRow("Invoice To");
 
         const header = {
-          // Row 3: "Invoice To" col A → Row 4 col A = "FIB 2 FAB"
+          // ── Company (own) fields — yellow section ──
           companyName:
             invoiceToRow >= 0
               ? belowVal(invoiceToRow, findCol("Invoice To"))
               : "",
 
-          // Rows 5+6 col A: "506, 4th FLOOR..." + "GIDC, VAPI-396195" → combine
-          // address: (() => {
-          //   const parts = [];
-          //   for (const { raw, lower } of allCells) {
-          //     if (lower.includes("floor") && lower.includes("tower")) parts.push(raw);
-          //     if (lower.includes("gidc") && lower.includes("vapi"))   parts.push(raw);
-          //   }
-          //   return parts.join(", ");
-          // })(),
           address: (() => {
-            let floor = "",
-              gidc = "";
+            let floor = "", gidc = "";
             for (const { raw, lower } of allCells) {
-              if (!floor && lower.includes("floor") && lower.includes("tower"))
-                floor = raw;
-              if (!gidc && lower.includes("gidc") && lower.includes("vapi"))
-                gidc = raw;
+              if (!floor && lower.includes("floor") && lower.includes("tower")) floor = raw;
+              if (!gidc && lower.includes("gidc") && lower.includes("vapi")) gidc = raw;
               if (floor && gidc) break;
             }
             return [floor, gidc].filter(Boolean).join(", ");
           })(),
 
-          // Row 7 col A: "MSME NO: GJ25E0006706" → after ":"
           msmeNo: (() => {
             for (const { raw, lower } of allCells) {
               if (lower.startsWith("msme no")) return afterColon(raw) || raw;
@@ -447,19 +460,19 @@ export default function UploadPurchaseOrder() {
             return "";
           })(),
 
-          // Row 8 col A: "GSTIN/UIN: 24AACFF..." → after ":"
+          // Company GSTIN — first occurrence (before supplier row)
           gstin: (() => {
-            for (const { raw, lower } of allCells) {
-              if (
-                lower.includes("gstin/uin:") ||
-                lower.includes("gstin/uin :")
-              ) {
+            for (const { row, raw, lower } of allCells) {
+              // Only look above supplier section
+              if (supplierRow > 0 && row >= supplierRow) continue;
+              if (lower.includes("gstin/uin:") || lower.includes("gstin/uin :")) {
                 const v = afterColon(raw);
                 if (v && v.length > 5) return v;
               }
             }
-            // fallback: label + adjacent col value
+            // fallback: label + adjacent col value above supplier row
             for (const { row, col, raw } of allCells) {
+              if (supplierRow > 0 && row >= supplierRow) continue;
               if (raw === "GSTIN/UIN:" || raw === "GSTIN/UIN :") {
                 return rightVal(row, col) || "";
               }
@@ -467,9 +480,9 @@ export default function UploadPurchaseOrder() {
             return "";
           })(),
 
-          // Row 9 col A: "State Name : Gujarat, Code : 24" → after ":"
           state: (() => {
-            for (const { raw, lower } of allCells) {
+            for (const { row, raw, lower } of allCells) {
+              if (supplierRow > 0 && row >= supplierRow) continue;
               if (lower.startsWith("state name")) {
                 const v = afterColon(raw);
                 if (v) return v;
@@ -480,7 +493,6 @@ export default function UploadPurchaseOrder() {
             return "";
           })(),
 
-          // Row 10 col A: "E-Mail : fib2fab..." → after ":"
           email: (() => {
             for (const { raw, lower } of allCells) {
               if (lower.startsWith("e-mail") || lower.startsWith("e-mail")) {
@@ -491,24 +503,63 @@ export default function UploadPurchaseOrder() {
             return "";
           })(),
 
-          // Row 3 col F: "Voucher No." → Row 4 col F = value (BELOW, not right)
           voucherNo: voucherRow >= 0 ? belowVal(voucherRow, voucherCol) : "",
-
-          // Row 3 col H: "Dates" → Row 4 col H = value (BELOW)
           dated: datesRow >= 0 ? belowVal(datesRow, datesCol) : "",
-
-          // Row 5 col H: "Mode/Terms of Payment" → Row 6 col H = "30 Days" (BELOW)
           paymentTerms: modeRow >= 0 ? belowVal(modeRow, modeCol) : "",
-
-          // Row 7 col F: "Reference No. & Date." → Row 8 col F = "2389/25-26" (BELOW)
           reference: refRow >= 0 ? belowVal(refRow, refCol) : "",
+          consignee: consigneeRow >= 0 ? belowVal(consigneeRow, consigneeCol) : "",
 
-          // "Consignee (Ship to)" → below = company name
-          consignee:
-            consigneeRow >= 0 ? belowVal(consigneeRow, consigneeCol) : "",
-
-          // "Supplier (Bill from)" → below = supplier name
+          // ── Supplier / Party fields — green section ──
+          // Supplier name — row just below "Supplier (Bill from)"
           supplier: supplierRow >= 0 ? belowVal(supplierRow, supplierCol) : "",
+
+          // Party address — collect lines below supplier name until GSTIN/State row
+          partyAddress: (() => {
+            if (supplierRow < 0) return "";
+            const parts = [];
+            // supplier name is at supplierRow+1, address starts at supplierRow+2
+            for (let r = supplierRow + 2; r <= Math.min(supplierRow + 10, range.e.r); r++) {
+              const v = getCellStr(r, supplierCol);
+              if (!v) continue;
+              const vl = v.toLowerCase();
+              // Stop when we hit GSTIN or State row
+              if (vl.includes("gstin") || vl.startsWith("state name")) break;
+              parts.push(v);
+            }
+            return parts.join(", ");
+          })(),
+
+          // Party GSTIN — GSTIN/UIN row inside the supplier (green) section
+          partyGstin: (() => {
+            if (supplierRow < 0) return "";
+            for (let r = supplierRow + 1; r <= Math.min(supplierRow + 10, range.e.r); r++) {
+              const v = getCellStr(r, supplierCol);
+              if (!v) continue;
+              const vl = v.toLowerCase();
+              if (vl.includes("gstin/uin:") || vl.includes("gstin/uin :")) {
+                const extracted = afterColon(v);
+                if (extracted && extracted.length > 5) return extracted;
+                // value might be in next cell to the right
+                return rightVal(r, supplierCol) || "";
+              }
+            }
+            return "";
+          })(),
+
+          // Party State — State Name row inside supplier section
+          partyState: (() => {
+            if (supplierRow < 0) return "";
+            for (let r = supplierRow + 1; r <= Math.min(supplierRow + 10, range.e.r); r++) {
+              const v = getCellStr(r, supplierCol);
+              if (!v) continue;
+              if (v.toLowerCase().startsWith("state name")) {
+                const extracted = afterColon(v);
+                if (extracted) return extracted;
+                return rightVal(r, supplierCol) || "";
+              }
+            }
+            return "";
+          })(),
         };
 
         setExcelHeader(header);
@@ -539,11 +590,7 @@ export default function UploadPurchaseOrder() {
         }
 
         // ── Detect columns ──
-        let descCol = -1,
-          hsnCol = -1,
-          partCol = -1,
-          qtyCol = -1,
-          slCol = 0;
+        let descCol = -1, hsnCol = -1, partCol = -1, qtyCol = -1, slCol = 0;
         for (let col = 0; col <= range.e.c; col++) {
           const v = getCellStr(tableStartRow, col).toLowerCase();
           if (v.includes("description")) descCol = col;
@@ -564,7 +611,6 @@ export default function UploadPurchaseOrder() {
         for (let row = tableStartRow + 2; row <= range.e.r; row++) {
           const desc = getCellStr(row, descCol);
           if (!desc) break;
-          // Skip total/subtotal rows
           if (
             desc.toLowerCase().includes("total") ||
             desc.toLowerCase().includes("grand")
@@ -575,12 +621,8 @@ export default function UploadPurchaseOrder() {
             slNo: getCellStr(row, slCol) || String(parsedItems.length + 1),
             productCode: partCol >= 0 ? getCellStr(row, partCol) : "",
             description: desc,
-            quantity:
-              qtyCol >= 0 ? parseFloat(getCellStr(row, qtyCol)) || 0 : 0,
-            unit: detectUnit(
-              desc,
-              partCol >= 0 ? getCellStr(row, partCol) : "",
-            ),
+            quantity: qtyCol >= 0 ? parseFloat(getCellStr(row, qtyCol)) || 0 : 0,
+            unit: detectUnit(desc, partCol >= 0 ? getCellStr(row, partCol) : ""),
             hsnSac: hsnCol >= 0 ? getCellStr(row, hsnCol) : "",
             available: 0,
             status: "ok",
@@ -678,10 +720,7 @@ export default function UploadPurchaseOrder() {
       {/* Step 1: Upload */}
       {step === 1 && (
         <Card>
-          <CardHeader
-            title="Upload Excel File"
-            subtitle="Purchase Order Excel"
-          />
+          <CardHeader title="Upload Excel File" subtitle="Purchase Order Excel" />
           <div className="p-6 space-y-4">
             <FileUpload
               label="Select Excel File"
@@ -720,50 +759,72 @@ export default function UploadPurchaseOrder() {
           {excelHeader && (
             <Card>
               <div className="px-6 py-4 bg-indigo-600 rounded-t-xl">
-                <h3 className="font-bold text-white text-base">
-                  PURCHASE ORDER
-                </h3>
-                <p className="text-indigo-200 text-xs">
-                  {items.length} items found
-                </p>
+                <h3 className="font-bold text-white text-base">PURCHASE ORDER</h3>
+                <p className="text-indigo-200 text-xs">{items.length} items found</p>
               </div>
-              <div className="p-6">
-                <p className="text-xs font-black text-slate-500 uppercase tracking-wide mb-4">
-                  Header Information
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    {
-                      label: "COMPANY (Invoice To)",
-                      val: excelHeader.companyName,
-                    },
-                    { label: "ADDRESS", val: excelHeader.address },
-                    { label: "MSME NO", val: excelHeader.msmeNo },
-                    { label: "GSTIN", val: excelHeader.gstin },
-                    { label: "STATE", val: excelHeader.state },
-                    { label: "EMAIL", val: excelHeader.email },
-                    { label: "VOUCHER NO", val: excelHeader.voucherNo },
-                    { label: "DATED", val: excelHeader.dated },
-                    { label: "PAYMENT TERMS", val: excelHeader.paymentTerms },
-                    { label: "CONSIGNEE", val: excelHeader.consignee },
-                    { label: "REFERENCE", val: excelHeader.reference },
-                    { label: "SUPPLIER", val: excelHeader.supplier },
-                  ]
-                    .filter((f) => f.val)
-                    .map(({ label, val }) => (
-                      <div
-                        key={label}
-                        className="bg-slate-50 p-3 rounded-lg border border-slate-100"
-                      >
-                        <p className="text-xs text-slate-400 uppercase font-semibold mb-1">
-                          {label}
-                        </p>
-                        <p className="text-sm font-medium text-slate-800">
-                          {val}
-                        </p>
-                      </div>
-                    ))}
+              <div className="p-6 space-y-6">
+
+                {/* ── Company Info (own) ── */}
+                <div>
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-wide mb-3">
+                    Company Information
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "COMPANY (Invoice To)", val: excelHeader.companyName },
+                      { label: "ADDRESS", val: excelHeader.address },
+                      { label: "MSME NO", val: excelHeader.msmeNo },
+                      { label: "GSTIN", val: excelHeader.gstin },
+                      { label: "STATE", val: excelHeader.state },
+                      { label: "EMAIL", val: excelHeader.email },
+                      { label: "VOUCHER NO", val: excelHeader.voucherNo },
+                      { label: "DATED", val: excelHeader.dated },
+                      { label: "PAYMENT TERMS", val: excelHeader.paymentTerms },
+                    ]
+                      .filter((f) => f.val)
+                      .map(({ label, val }) => (
+                        <div
+                          key={label}
+                          className="bg-slate-50 p-3 rounded-lg border border-slate-100"
+                        >
+                          <p className="text-xs text-slate-400 uppercase font-semibold mb-1">
+                            {label}
+                          </p>
+                          <p className="text-sm font-medium text-slate-800">{val}</p>
+                        </div>
+                      ))}
+                  </div>
                 </div>
+
+                {/* ── Supplier / Party Info (green section) ── */}
+                {(excelHeader.supplier || excelHeader.partyGstin || excelHeader.partyAddress) && (
+                  <div>
+                    <p className="text-xs font-black text-emerald-600 uppercase tracking-wide mb-3">
+                      Supplier / Party Information
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { label: "SUPPLIER NAME", val: excelHeader.supplier },
+                        { label: "PARTY ADDRESS", val: excelHeader.partyAddress },
+                        { label: "PARTY GSTIN", val: excelHeader.partyGstin },
+                        { label: "PARTY STATE", val: excelHeader.partyState },
+                      ]
+                        .filter((f) => f.val)
+                        .map(({ label, val }) => (
+                          <div
+                            key={label}
+                            className="bg-white p-1 rounded-lg border border-emerald-300"
+                          >
+                            <p className="text-xs text-emerald-600 uppercase font-semibold mb-1">
+                              {label}
+                            </p>
+                            <p className="text-sm font-medium text-slate-800">{val}</p>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
               </div>
             </Card>
           )}
@@ -788,14 +849,7 @@ export default function UploadPurchaseOrder() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    {[
-                      "Sl",
-                      "Part No.",
-                      "Description",
-                      "HSN/SAC",
-                      "Quantity",
-                      "Unit",
-                    ].map((h) => (
+                    {["Sl", "Part No.", "Description", "HSN/SAC", "Quantity", "Unit"].map((h) => (
                       <th
                         key={h}
                         className="px-4 py-3 text-start text-xs font-bold text-slate-500 uppercase tracking-wide whitespace-nowrap"
@@ -808,24 +862,12 @@ export default function UploadPurchaseOrder() {
                 <tbody className="divide-y divide-slate-100">
                   {items.map((item, idx) => (
                     <tr key={idx} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 text-slate-400 text-xs text-center">
-                        {item.slNo}
-                      </td>
-                      <td className="px-4 py-3 font-bold font-mono text-slate-800  text-start">
-                        {item.productCode}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600  text-start ">
-                        {item.description}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500  font-mono text-xs">
-                        {item.hsnSac}
-                      </td>
-                      <td className="px-4 py-3 font-bold ">
-                        {item.quantity}
-                      </td>
-                      <td className="px-4 py-3 text-slate-400 text-center">
-                        {item.unit}
-                      </td>
+                      <td className="px-4 py-3 text-slate-400 text-xs text-center">{item.slNo}</td>
+                      <td className="px-4 py-3 font-bold font-mono text-slate-800 text-start">{item.productCode}</td>
+                      <td className="px-4 py-3 text-slate-600 text-start">{item.description}</td>
+                      <td className="px-4 py-3 text-slate-500 font-mono text-xs">{item.hsnSac}</td>
+                      <td className="px-4 py-3 font-bold">{item.quantity}</td>
+                      <td className="px-4 py-3 text-slate-400 text-center">{item.unit}</td>
                     </tr>
                   ))}
                 </tbody>
