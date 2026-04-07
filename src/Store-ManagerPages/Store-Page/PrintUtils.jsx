@@ -1,5 +1,7 @@
 // printUtils.js — call these from Print buttons
 
+import { printInvoiceDetails } from "./PrintUtils";
+import { printSODetails } from "./PrintUtils";
 export function printInvoiceDetails(inv) {
   const items = inv.items || [];
   const totalQty = items.reduce((s, i) => s + (i.newReceived || i.invoiceQty || 0), 0);

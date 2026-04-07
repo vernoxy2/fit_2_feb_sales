@@ -1,5 +1,5 @@
 import React from "react";
-import { FiFileText, FiShield, FiClock, FiEye, FiPrinter } from "react-icons/fi";
+import { FiShoppingCart, FiShield, FiClock, FiEye, FiPrinter } from "react-icons/fi";
 import { Card, CardHeader } from "../StoreComponent/ui/index";
 import { printSODetails } from "./PrintUtils";
 
