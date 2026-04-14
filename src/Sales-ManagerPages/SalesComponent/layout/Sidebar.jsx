@@ -124,10 +124,10 @@ useEffect(() => {
                    location.pathname.startsWith("/sales/sales-orders/") && !["/sales/sales-orders", "/sales/sales-orders/upload", "/sales/sales-orders/create"].includes(location.pathname)
         },
         { to: "/sales/upload-sales-invoice",  icon: FiUpload,      label: "Upload Sales Invoice" },
-        { to: "/sales/ready-for-dispatch",    icon: FiBell,        label: "Ready for Dispatch",       badgeColor: "emerald" },
-        { to: "/sales/dispatch-on-challan",   icon: FiTruck,       label: "Dispatch on Challan" },
-        { to: "/sales/unbilled-challans",     icon: FiClock,       label: "Unbilled Challans",     badge: unbilledCount || null,    badgeColor: "red" },
         { to: "/sales/invoice-history",       icon: FiArchive,     label: "Sales Invoice History" },
+        { to: "/sales/dispatch-on-challan",   icon: FiTruck,       label: "Dispatch on Challan" },
+        { to: "/sales/ready-for-dispatch",    icon: FiBell,        label: "Ready for Dispatch",       badgeColor: "emerald" },
+        { to: "/sales/unbilled-challans",     icon: FiClock,       label: "Unbilled Challans",     badge: unbilledCount || null,    badgeColor: "red" },
         { to: "/sales/debit-credit-notes",    icon: FiRefreshCw,   label: "Debit/Credit Notes",    badge: debitNotesCount || null,    badgeColor: "amber" },
       ],
     },

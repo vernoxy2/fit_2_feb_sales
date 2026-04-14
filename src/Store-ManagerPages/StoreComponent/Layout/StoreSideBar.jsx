@@ -18,9 +18,7 @@ import {
   doc,
   getDoc,
   collection,
-  onSnapshot,
-  query,
-  where,
+  onSnapshot, 
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../../../firebase";
@@ -36,7 +34,7 @@ export default function StoreSidebar({ collapsed, setCollapsed }) {
   const [qcPendingCount, setQcPendingCount] = useState(0);
   const [debitNotesCount, setDebitNotesCount] = useState(0); // ✅ dynamic
   const [ReceivedOnChallan, setReceivedOnChallan] = useState(0);
-  const [lowStockCount, setLowStockCount] = useState(0);
+  const [lowStockCount] = useState(0);
   // ── QC Pending count ────────────────────────────────────────────────────
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "excelupload"), (snap) => {
@@ -194,13 +192,13 @@ export default function StoreSidebar({ collapsed, setCollapsed }) {
           badge: qcPendingCount > 0 ? qcPendingCount : null,
           badgeColor: "emerald",
         },
-        {
-          to: "/store/store-Received-On-Challan",
-          icon: FiInbox,
-          label: "Received On Challan",
-          badge: ReceivedOnChallan > 0 ? ReceivedOnChallan : null,
-          badgeColor: "amber",
-        },
+        // {
+        //   to: "/store/store-Received-On-Challan",
+        //   icon: FiInbox,
+        //   label: "Received On Challan",
+        //   badge: ReceivedOnChallan > 0 ? ReceivedOnChallan : null,
+        //   badgeColor: "amber",
+        // },
         {
           to: "/store/debit-notes",
           icon: FiFileText,

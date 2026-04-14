@@ -89,6 +89,7 @@ const App = () => {
         {/* DISPATCH */}
         {/* <Route path="/sales/dispatch-on-challan"        element={<DispatchOnChallanList />} /> */}
         <Route path="dispatch-on-challan" element={<DispatchOnChallanList />} />
+        <Route path="dispatch-on-challan/edit/:id" element={<DispatchOnChallanList />} />
         <Route
           path="dispatch-on-challan-list"
           element={<DispatchOnChallanList />}
