@@ -165,18 +165,6 @@ export default function PurchaseOrderQCList({
                   </div>
 
                   <div className="ml-4 flex items-center gap-2">
-                    {isApproved && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          printInvoiceDetails(inv);
-                        }}
-                        className="px-3 py-2 bg-slate-100 text-slate-600 border border-slate-200 text-xs font-bold rounded-lg hover:bg-slate-200 transition-colors whitespace-nowrap flex items-center gap-1.5"
-                      >
-                        <FiPrinter size={12} /> Print
-                      </button>
-                    )}
-
                     {isApproved ? (
                       <button
                         onClick={(e) => {
