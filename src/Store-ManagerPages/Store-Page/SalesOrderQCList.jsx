@@ -155,18 +155,6 @@ export default function SalesOrderQCList({
                   </div>
 
                   <div className="ml-4 flex items-center gap-2">
-                    {isComplete && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          printSODetails(so);
-                        }}
-                        className="px-3 py-2 bg-slate-100 text-slate-600 border border-slate-200 text-xs font-bold rounded-lg hover:bg-slate-200 transition-colors whitespace-nowrap flex items-center gap-1.5"
-                      >
-                        <FiPrinter size={12} /> Print
-                      </button>
-                    )}
-
                     {isComplete ? (
                       <button
                         onClick={() => handleSelectSO(so)}
