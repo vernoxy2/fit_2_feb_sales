@@ -7,7 +7,7 @@ import {
 } from "../SalesComponent/ui/index";
 import { db } from "../../firebase";
 // import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
-import { collection, addDoc, getDocs, query, where, updateDoc, doc, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, doc, deleteDoc } from "firebase/firestore";
 import * as XLSX from "xlsx";
 
 function detectUnit(description = "", productCode = "") {
