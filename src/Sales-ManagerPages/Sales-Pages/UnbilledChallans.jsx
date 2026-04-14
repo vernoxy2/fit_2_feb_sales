@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { db } from "../../firebase";
 import {
   collection,
@@ -7,6 +8,7 @@ import {
   updateDoc,
   query,
   orderBy,
+  onSnapshot,
 } from "firebase/firestore";
 import * as XLSX from "xlsx";
 
@@ -67,7 +69,7 @@ const STATUS_CFG = {
   overdue: {
     label: "Overdue",
     dot: "bg-red-500",
-    tag: "bg-red-50 text-red-700 border-red-200",
+    tag: "bg-red-700 text-red-700 border-red-200",
   },
 };
 
@@ -115,6 +117,20 @@ const EyeIcon = () => (
   >
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
     <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+const EditIcon = () => (
+  <svg
+    className="w-3.5 h-3.5"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
   </svg>
 );
 const BackIcon = () => (
@@ -228,27 +244,27 @@ function SummaryCards({ challans }) {
       icon: "⏰",
       grad: "from-rose-500 to-red-700",
     },
-    {
-      label: "PARTIAL",
-      value: counts.partial || 0,
-      icon: "🔄",
-      grad: "from-amber-400 to-orange-500",
-    },
-    {
-      label: "EXCESS",
-      value: counts.excess || 0,
-      icon: "🔵",
-      grad: "from-blue-400 to-blue-600",
-    },
-    {
-      label: "PENDING VALUE",
-      value: fmt(pending),
-      icon: "💰",
-      grad: "from-violet-500 to-indigo-600",
-    },
+    // {
+    //   label: "PARTIAL",
+    //   value: counts.partial || 0,
+    //   icon: "🔄",
+    //   grad: "from-amber-400 to-orange-500",
+    // },
+    // {
+    //   label: "EXCESS",
+    //   value: counts.excess || 0,
+    //   icon: "🔵",
+    //   grad: "from-blue-400 to-blue-600",
+    // },
+    // {
+    //   label: "PENDING VALUE",
+    //   value: fmt(pending),
+    //   icon: "💰",
+    //   grad: "from-violet-500 to-indigo-600",
+    // },
   ];
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+    <div className="grid grid-cols-2 lg:grid-cols-2 gap-4 mb-6">
       {cards.map((card) => (
         <div
           key={card.label}
@@ -274,9 +290,48 @@ function SummaryCards({ challans }) {
 }
 
 function ChallanDetailModal({ challan, onClose }) {
+  const [itemsWithStock, setItemsWithStock] = useState([]);
+  const [globalStock, setGlobalStock] = useState({});
+
+  // 1. Listen to global stock for real-time updates
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "stock"), (snap) => {
+      const stockMap = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        const code = (data.productCode || "").trim().toUpperCase();
+        if (code) stockMap[code] = data;
+      });
+      setGlobalStock(stockMap);
+    });
+    return () => unsub();
+  }, []);
+
+  // 2. Map items whenever challan or globalStock changes
+  useEffect(() => {
+    if (!challan.items) return;
+    
+    const updated = challan.items.map(item => {
+      const pCode = (item.productCode || item.partNo || "").trim().toUpperCase();
+      const sData = globalStock[pCode];
+      
+      const deductQty = Number(item.dispatchQty || item.quantity || 0);
+      const currentStock = sData ? Number(sData.available ?? sData.quantity ?? 0) : 0;
+
+      return {
+        ...item,
+        stockInfo: {
+          deduct: deductQty,
+          current: currentStock,
+        }
+      };
+    });
+    setItemsWithStock(updated);
+  }, [challan, globalStock]);
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h3 className="font-bold text-slate-800">
@@ -296,76 +351,61 @@ function ChallanDetailModal({ challan, onClose }) {
             </button>
           </div>
         </div>
-        <div className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3 text-xs">
+        <div className="p-6 space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
             {[
               ["Challan No", challan.challanNo],
               ["Date", challan.header?.challanDate],
-              [
-                "Customer",
-                challan.header?.customer || challan.header?.companyName,
-              ],
+              ["Customer", challan.header?.customer || challan.header?.companyName],
+              ["SO Reference", challan.soReference || challan.header?.soReference],
               ["Due Date", challan.header?.approxInvoiceDate],
               ["Destination", challan.header?.destination],
-              ["GSTIN", challan.header?.gstin],
-              ["Address", challan.header?.address],
-              ["Consignee", challan.header?.consignee],
+              ["GSTIN", challan.header?.gstNo || challan.header?.gstin],
+              ["Vehicle No", challan.header?.vehicleNo],
             ]
               .filter(([, v]) => v)
               .map(([k, v]) => (
-                <div key={k} className="bg-slate-50 rounded-lg px-3 py-2">
-                  <p className="text-slate-400 mb-0.5">{k}</p>
+                <div key={k} className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                  <p className="text-slate-400 mb-0.5 font-bold uppercase tracking-tighter" style={{fontSize: '9px'}}>{k}</p>
                   <p className="font-semibold text-slate-700">{v}</p>
                 </div>
               ))}
           </div>
-          {challan.items?.length > 0 && (
-            <div className="rounded-xl border border-slate-100 overflow-hidden">
+
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-bold text-slate-800">Item & Stock Details</h4>
+            </div>
+            <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="bg-slate-50 text-slate-400 font-semibold uppercase">
-                    <th className="px-3 py-2.5 text-left">Item</th>
-                    <th className="px-3 py-2.5 text-left">Code</th>
-                    <th className="px-3 py-2.5 text-left">Part No.</th>
-                    <th className="px-3 py-2.5 text-right">Qty</th>
-                    <th className="px-3 py-2.5 text-right">Rate</th>
-                    <th className="px-3 py-2.5 text-right">Total</th>
+                  <tr className="bg-slate-800 text-white font-semibold uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left">Item Description</th>
+                    <th className="px-4 py-3 text-left">Part No</th>
+                    <th className="px-4 py-3 text-right bg-indigo-900">Deduct Qty</th>
+                    <th className="px-4 py-3 text-right bg-emerald-800">Stock Qty</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {challan.items.map((item, i) => (
-                    <tr key={i} className="hover:bg-slate-50">
-                      <td className="px-3 py-2 text-slate-600">
+                <tbody className="divide-y divide-slate-100">
+                  {itemsWithStock.map((item, i) => (
+                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 text-slate-700 font-medium">
                         {item.description || "—"}
                       </td>
-                      <td className="px-3 py-2 text-slate-500 font-mono">
-                        {item.productCode || "—"}
+                      <td className="px-4 py-3 text-slate-500 font-mono font-bold">
+                        {item.productCode || item.partNo || "—"}
                       </td>
-                      <td className="px-3 py-2 text-right text-slate-600">
-                        {item.dispatchQty || item.quantity || "—"}
+                      <td className="px-4 py-3 text-right font-black text-indigo-600 bg-indigo-50">
+                        {item.stockInfo ? item.stockInfo.deduct : (item.dispatchQty || item.quantity || "—")}
                       </td>
-
-                      <td className="px-3 py-2 text-right text-slate-600">
-                        ₹{item.rate || "—"}
-                      </td>
-                      <td className="px-3 py-2 text-right font-semibold">
-                        ₹
-                        {Number(item.total || item.amount || 0).toLocaleString(
-                          "en-IN",
-                        )}
+                      <td className="px-4 py-3 text-right font-black text-emerald-700 bg-emerald-50">
+                        {/* {item.stockInfo ? item.stockInfo.current : 0} */}
+                        {itemsWithStock.reduce((s, item) => s + (Number(item.dispatchQty || item.quantity) || 0), 0)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
-          <div className="flex justify-end">
-            <div className="bg-slate-800 text-white rounded-xl px-5 py-3">
-              <span className="text-xs text-slate-400 mr-3">Total Amount</span>
-              <span className="text-lg font-black">
-                ₹{Number(challan.totalAmount || 0).toLocaleString("en-IN")}
-              </span>
             </div>
           </div>
         </div>
@@ -383,8 +423,15 @@ function ChallanTable({
   onCreateInvoice,
   onView,
 }) {
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
+
+  const handleEdit = (ch) => {
+    navigate(`/sales/dispatch-on-challan/edit/${ch.id}`, {
+      state: { editChallan: ch },
+    });
+  };
 
   const filtered = challans
     .filter((c) => statusFilter === "all" || c._status === statusFilter)
@@ -456,14 +503,14 @@ function ChallanTable({
               <ChevDown />
             </div>
           </div>
-          {selectedIds.length > 0 && (
+          {/* {selectedIds.length > 0 && (
             <button
               onClick={() => onCreateInvoice(selectedIds)}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 text-white shadow hover:bg-indigo-700 transition-all"
             >
               <UploadIcon /> Create Invoice ({selectedIds.length})
             </button>
-          )}
+          )} */}
         </div>
       </div>
       <div className="overflow-x-auto">
@@ -488,7 +535,7 @@ function ChallanTable({
                 <th className="px-5 py-3 text-left">Part No</th>
                 <th className="px-5 py-3 text-left">Customer Name</th>
                 <th className="px-5 py-3 text-left">Approx Invoice Date</th>
-                <th className="px-5 py-3 text-right">Amount</th>
+                {/* <th className="px-5 py-3 text-right">Amount</th> */}
                 <th className="px-5 py-3 text-left">Status</th>
                 <th className="px-5 py-3 text-left">Action</th>
               </tr>
@@ -528,25 +575,32 @@ function ChallanTable({
                         ch.header?.approximateInvoiceDate ||
                         "—"}
                     </td>
-                    <td className="px-5 py-4 text-right font-semibold text-slate-800">
+                    {/* <td className="px-5 py-4 text-right font-semibold text-slate-800">
                       {ch.totalAmount
                         ? `₹${Number(ch.totalAmount).toLocaleString("en-IN")}`
                         : "—"}
-                    </td>
+                    </td> */}
                     <td className="px-5 py-4">
                       <StatusBadge status={ch._status} />
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
                         {/* Complete = no button, others = show button */}
-                        {!isComplete && (
+                        {/* {!isComplete && (
                           <button
                             onClick={() => onCreateInvoice([ch.id])}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-all shadow-sm"
                           >
                             <UploadIcon /> Create Invoice
                           </button>
-                        )}
+                        )} */}
+                        <button
+                          onClick={() => handleEdit(ch)}
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 transition-all"
+                          title="Edit Challan"
+                        >
+                          <EditIcon />
+                        </button>
                         <button
                           onClick={() => onView(ch)}
                           className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all"

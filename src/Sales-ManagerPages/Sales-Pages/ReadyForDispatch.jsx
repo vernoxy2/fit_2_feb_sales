@@ -20,7 +20,7 @@ export default function ReadyForDispatch() {
       // Fetch SOs
       const q = query(
         collection(db, "excelupload"),
-        where("soStatus", "in", ["complete", "ready_to_dispatch"])
+        where("soStatus", "in", ["complete", "ready_to_dispatch", "ready_for_dispatch", "ready"])
       );
       const snap = await getDocs(q);
       const data = snap.docs
