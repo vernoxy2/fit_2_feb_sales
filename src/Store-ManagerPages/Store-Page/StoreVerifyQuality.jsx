@@ -7,6 +7,7 @@ import {
   FiClock,
   FiAlertCircle,
   FiShield,
+  FiPrinter,
 } from "react-icons/fi";
 import {
   Card,
@@ -29,7 +30,7 @@ import {
 
 import SalesOrderQCList from "./SalesOrderQCList";
 import PurchaseOrderQCList from "./PurchaseOrderQCList";
-
+// import { printInvoiceDetails } from "./PrintUtils";
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function formatDateTime(isoStr) {
   if (!isoStr) return "—";
@@ -103,7 +104,8 @@ function calcPoStatus(items) {
   );
   if (statuses.every((s) => s === "complete")) return "complete";
   if (statuses.some((s) => s === "excess")) return "excess";
-  if (statuses.some((s) => s === "partial" || s === "complete")) return "partial";
+  if (statuses.some((s) => s === "partial" || s === "complete"))
+    return "partial";
   return "ordered";
 }
 
@@ -162,7 +164,8 @@ async function addToStock(items, poNumber, vendor, isReplacement = false) {
       const netAvail = currentAvail + qty - clearedBackorder;
       const orderedQty = item.orderedQty || qty;
       const totalReceived = item.totalReceivedQty || 0;
-      const excessQty = totalReceived > orderedQty ? totalReceived - orderedQty : 0;
+      const excessQty =
+        totalReceived > orderedQty ? totalReceived - orderedQty : 0;
       const newDamagedQty = isReplacement
         ? 0
         : parseFloat(sdata.damagedQty || 0) + damagedQty;
@@ -193,8 +196,18 @@ async function addToStock(items, poNumber, vendor, isReplacement = false) {
 
 function isSalesOrder(type) {
   if (!type) return false;
-  const t = type.trim().toLowerCase().replace(/[\s_\-\.]/g, "");
-  return ["salesorder", "so", "workorder", "wo", "sales", "sales_order"].includes(t);
+  const t = type
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_\-\.]/g, "");
+  return [
+    "salesorder",
+    "so",
+    "workorder",
+    "wo",
+    "sales",
+    "sales_order",
+  ].includes(t);
 }
 
 function QtyInput({ initialValue, onChange }) {
@@ -224,6 +237,7 @@ function QtyInput({ initialValue, onChange }) {
 export default function StoreVerifyQuality() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  const itemsPerPage = 10;
   const [pendingInvoices, setPendingInvoices] = useState([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [pendingSalesOrders, setPendingSalesOrders] = useState([]);
@@ -243,7 +257,301 @@ export default function StoreVerifyQuality() {
   const [remarks, setRemarks] = useState("");
   const [uploading, setUploading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+
+  const handlePrintSO = () => {
+    const soNum = selectedSO?.soNumber || "—";
+    const customer = selectedSO?.customer || "—";
+    const deliveryDate = selectedSO?.deliveryDate || "—";
+    const totalItems = soItems.length;
+    const totalReady = soTotalReady;
+    const totalShortage = soTotalShortage;
+    const statusText = totalShortage === 0 ? "✅ Ready" : "⚠ Pending";
+    const printDate = new Date().toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+    const printTime = new Date().toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    const html = [
+      '<!DOCTYPE html><html><head><meta charset="UTF-8"/>',
+      "<title>SO QC — " + soNum + "</title>",
+      "<style>",
+      "* { margin:0; padding:0; box-sizing:border-box; }",
+      "body { font-family: Arial, sans-serif; font-size:13px; color:#1e293b; padding:32px; }",
+      ".header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #1e293b; padding-bottom:14px; margin-bottom:24px; }",
+      ".company { font-size:20px; font-weight:900; }",
+      ".subtitle { font-size:12px; color:#64748b; margin-top:4px; }",
+      ".info-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; margin-bottom:24px; padding:18px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0; }",
+      ".info-item label { font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; display:block; margin-bottom:5px; }",
+      ".info-item span { font-size:14px; font-weight:700; color:#1e293b; }",
+      ".summary-title { font-size:11px; font-weight:700; text-transform:uppercase; color:#64748b; margin-bottom:12px; }",
+      ".summary-grid { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px; margin-bottom:32px; }",
+      ".summary-box { padding:14px 16px; border-radius:8px; text-align:center; }",
+      ".summary-box label { font-size:10px; font-weight:700; text-transform:uppercase; color:#64748b; display:block; margin-bottom:6px; }",
+      ".summary-box span { font-size:22px; font-weight:900; display:block; }",
+      ".box-total { background:#f1f5f9; border:1px solid #e2e8f0; } .box-total span { color:#1e293b; }",
+      ".box-ready { background:#f0fdf4; border:1px solid #bbf7d0; } .box-ready span { color:#16a34a; }",
+      ".box-short { background:#fff7ed; border:1px solid #fed7aa; } .box-short span { color:#ea580c; }",
+      ".box-status { background:#f5f3ff; border:1px solid #ddd6fe; } .box-status span { color:#7c3aed; font-size:14px; padding-top:6px; }",
+      ".sign-row { display:flex; justify-content:space-between; margin-top:48px; }",
+      ".sign-box { text-align:center; width:160px; }",
+      ".sign-line { border-bottom:1px solid #94a3b8; margin-bottom:6px; height:40px; }",
+      ".sign-label { font-size:10px; color:#64748b; }",
+      ".footer { margin-top:28px; padding-top:12px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; font-size:10px; color:#94a3b8; }",
+      "@media print { body { padding:16px; } .no-print { display:none !important; } }",
+      "</style></head><body>",
+      '<div class="no-print" style="background:#1e293b;color:white;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;margin:-32px -32px 24px -32px;">',
+      '<span style="font-weight:700;font-size:13px;">📄 SO QC Print Preview — ' +
+        soNum +
+        "</span>",
+      '<button onclick="window.print()" style="background:#16a34a;color:white;border:none;padding:8px 20px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">🖨️ Print</button>',
+      "</div>",
+      '<div class="header"><div>',
+      '<div class="company">FIB-2-FAB ERP</div>',
+      '<div class="subtitle">Store Quality Check · Dispatch Verification</div>',
+      '</div><div style="text-align:right;">',
+      '<div style="font-size:11px;color:#64748b;">Print Date</div>',
+      '<div style="font-weight:700;font-size:13px;">' + printDate + "</div>",
+      '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">' +
+        printTime +
+        "</div>",
+      "</div></div>",
+      '<div class="info-grid">',
+      '<div class="info-item"><label>SO Number</label><span>' +
+        soNum +
+        "</span></div>",
+      '<div class="info-item"><label>Customer</label><span>' +
+        customer +
+        "</span></div>",
+      '<div class="info-item"><label>Delivery Date</label><span>' +
+        deliveryDate +
+        "</span></div>",
+      "</div>",
+      "</div>",
+      '<div style="margin-bottom:24px;">',
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:10px;letter-spacing:0.05em;">Item-wise Dispatch Details</div>',
+      '<table style="width:100%;border-collapse:collapse;">',
+      "<thead>",
+      '<tr style="background:#1e293b;color:white;">',
+      '<th style="padding:15px 10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:40px;">#</th>',
+      '<th style="padding:10px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;">Part No</th>',
+      '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;">Description</th>',
+      '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:60px;">Unit</th>',
+      '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:80px;">Ordered</th>',
+      '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:80px;">Ready</th>',
+      "</tr>",
+      "</thead>",
+      "<tbody>",
+      ...soItems.map((item, idx) => {
+        const ordered = item.orderedQty || 0;
+        const ready = item.readyQty ?? 0;
+        const shortage = Math.max(0, ordered - ready);
+        const isShort = shortage > 0;
+        const bg = idx % 2 === 0 ? "#ffffff" : "#f8fafc";
+        return [
+          '<tr style="background:' + bg + ';border-bottom:1px solid #e2e8f0;">',
+          '<td style="padding:7px 10px;text-align:center;font-size:12px;color:#64748b;">' +
+            (idx + 1) +
+            "</td>",
+          '<td style="padding:7px 10px;font-family:monospace;font-weight:700;font-size:12px;color:#1e293b;">' +
+            (item.productCode || "—") +
+            "</td>",
+          '<td style="padding:7px 10px;font-size:12px;color:#475569;">' +
+            (item.description || "—") +
+            "</td>",
+          '<td style="padding:7px 10px;text-align:center;font-size:12px;color:#64748b;">' +
+            (item.unit || "pcs") +
+            "</td>",
+          '<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:#1e293b;">' +
+            ordered +
+            "</td>",
+          '<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:#16a34a;">' +
+            ready +
+            "</td>",
+          "</tr>",
+        ].join("");
+      }),
+      "</tbody>",
+      "</table>",
+      "</div>",
+      '<div style="display:grid;grid-template-columns:1fr 1fr ;gap:12px;margin:24px 0;">',
+      '<div style="padding:14px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;text-align:center;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">Total Items</div><div style="font-size:22px;font-weight:900;color:#1e293b;">' +
+        totalItems +
+        "</div></div>",
+      '<div style="padding:14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;text-align:center;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">Total Ready</div><div style="font-size:22px;font-weight:900;color:#16a34a;">' +
+        totalReady +
+        "</div></div>",
+      '<div class="footer">',
+      "</div>",
+      "</body></html>",
+    ].join("");
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const printTab = window.open(url, "_blank");
+    if (printTab) {
+      printTab.addEventListener("load", () => URL.revokeObjectURL(url));
+    }
+  };
+
+  const handlePrintPO = () => {
+    const poNum = selectedPO?.poNumber || "—";
+    const vendor = selectedPO?.vendor || "—";
+    const invoiceNumber = invoiceNo || "—";
+    const invDate = invoiceDate
+      ? new Date(invoiceDate).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : "—";
+    const printDate = new Date().toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+    const printTime = new Date().toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+    const totalReceived = getTotalNewReceived();
+    const totalShortage = getTotalShortage();
+
+    const html = [
+      '<!DOCTYPE html><html><head><meta charset="UTF-8"/>',
+      "<title>PO QC — " + poNum + "</title>",
+      "<style>",
+      "* { margin:0; padding:0; box-sizing:border-box; }",
+      "body { font-family: Arial, sans-serif; font-size:13px; color:#1e293b; padding:32px; }",
+      ".header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #1e293b; padding-bottom:14px; margin-bottom:24px; }",
+      ".company { font-size:20px; font-weight:900; }",
+      ".subtitle { font-size:12px; color:#64748b; margin-top:4px; }",
+      ".info-grid { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:20px; margin-bottom:24px; padding:18px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0; }",
+      ".info-item label { font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; display:block; margin-bottom:5px; }",
+      ".info-item span { font-size:14px; font-weight:700; color:#1e293b; }",
+      ".footer { margin-top:28px; padding-top:12px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; font-size:10px; color:#94a3b8; }",
+      "@media print { body { padding:16px; } .no-print { display:none !important; } }",
+      "</style></head><body>",
+      '<div class="no-print" style="background:#1e293b;color:white;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;margin:-32px -32px 24px -32px;">',
+      '<span style="font-weight:700;font-size:13px;">📄 PO QC Print Preview — ' +
+        poNum +
+        "</span>",
+      '<button onclick="window.print()" style="background:#16a34a;color:white;border:none;padding:8px 20px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">🖨️ Print</button>',
+      "</div>",
+      '<div class="header"><div>',
+      '<div class="company">FIB-2-FAB ERP</div>',
+      '<div class="subtitle">Store Quality Check · Purchase Order Receipt</div>',
+      '</div><div style="text-align:right;">',
+      '<div style="font-size:11px;color:#64748b;">Print Date</div>',
+      '<div style="font-weight:700;font-size:13px;">' + printDate + "</div>",
+      '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">' +
+        printTime +
+        "</div>",
+      "</div></div>",
+      '<div class="info-grid">',
+      '<div class="info-item"><label>PO Number</label><span>' +
+        poNum +
+        "</span></div>",
+      '<div class="info-item"><label>Vendor</label><span>' +
+        vendor +
+        "</span></div>",
+      '<div class="info-item"><label>Invoice No</label><span>' +
+        invoiceNumber +
+        "</span></div>",
+      '<div class="info-item"><label>Invoice Date</label><span>' +
+        invDate +
+        "</span></div>",
+      "</div>",
+      '<div style="margin-bottom:24px;">',
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:10px;letter-spacing:0.05em;">Item-wise Receipt Details</div>',
+      '<table style="width:100%;border-collapse:collapse;">',
+      "<thead>",
+      '<tr style="background:#1e293b;color:white;">',
+      '<th style="padding:10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:40px;">#</th>',
+      '<th style="padding:10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;">Part No</th>',
+      '<th style="padding:10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;">Description</th>',
+      '<th style="padding:10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:60px;">Unit</th>',
+      '<th style="padding:10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:80px;">Ordered</th>',
+      '<th style="padding:10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:80px;">Invoice</th>',
+      '<th style="padding:10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:80px;">Physical</th>',
+      '<th style="padding:10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:80px;">Issue</th>',
+      "</tr>",
+      "</thead>",
+      "<tbody>",
+      ...receivedItems.map((item, idx) => {
+        const phys = item.physicalQty ?? item.newReceived ?? 0;
+        const inv = item.newReceived ?? 0;
+        const ordered = item.orderedQty || 0;
+        const bg = idx % 2 === 0 ? "#ffffff" : "#f8fafc";
+        const issueColor = item.issue ? "#dc2626" : "#16a34a";
+        const issueText = item.issue
+          ? item.issue.replace("_", " ").toUpperCase()
+          : "OK";
+        return [
+          '<tr style="background:' + bg + ';border-bottom:1px solid #e2e8f0;">',
+          '<td style="padding:7px 10px;text-align:center;font-size:12px;color:#64748b;">' +
+            (idx + 1) +
+            "</td>",
+          '<td style="padding:7px 10px;font-family:monospace;font-weight:700;font-size:12px;color:#1e293b;">' +
+            (item.productCode || "—") +
+            "</td>",
+          '<td style="padding:7px 10px;font-size:12px;color:#475569;">' +
+            (item.description || "—") +
+            "</td>",
+          '<td style="padding:7px 10px;text-align:center;font-size:12px;color:#64748b;">' +
+            (item.unit || "pcs") +
+            "</td>",
+          '<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:#1e293b;">' +
+            ordered +
+            "</td>",
+          '<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:#3b82f6;">' +
+            inv +
+            "</td>",
+          '<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:#16a34a;">' +
+            phys +
+            "</td>",
+          '<td style="padding:7px 10px;text-align:center;font-size:11px;font-weight:700;color:' +
+            issueColor +
+            ';">' +
+            issueText +
+            "</td>",
+          "</tr>",
+        ].join("");
+      }),
+      "</tbody>",
+      "</table>",
+      "</div>",
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:32px;">',
+      '<div style="padding:14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;text-align:center;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">Total Received</div><div style="font-size:22px;font-weight:900;color:#16a34a;">' +
+        totalReceived +
+        "</div></div>",
+      '<div style="padding:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;text-align:center;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">Still Pending</div><div style="font-size:22px;font-weight:900;color:#ea580c;">' +
+        totalShortage +
+        "</div></div>",
+      '<div style="padding:14px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;text-align:center;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">PO Status</div><div style="font-size:14px;font-weight:900;color:#7c3aed;padding-top:6px;">' +
+        livePoStatus.toUpperCase() +
+        "</div></div>",
+      "</div>",
+      '<div class="footer"><span>FIB-2-FAB ERP · Store QC Module</span><span>PO: ' +
+        poNum +
+        " · " +
+        printDate +
+        "</span></div>",
+      "</body></html>",
+    ].join("");
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const printTab = window.open(url, "_blank");
+    if (printTab)
+      printTab.addEventListener("load", () => URL.revokeObjectURL(url));
+  };
 
   const setSoItemsSync = (items) => {
     soItemsRef.current = items;
@@ -289,7 +597,15 @@ export default function StoreVerifyQuality() {
       currentPage,
     };
     localStorage.setItem("storeQcDraft", JSON.stringify(data));
-  }, [step, receivedItems, qualityCheck, remarks, currentPage, invoiceNo, invoiceDate]);
+  }, [
+    step,
+    receivedItems,
+    qualityCheck,
+    remarks,
+    currentPage,
+    invoiceNo,
+    invoiceDate,
+  ]);
 
   const fetchPendingInvoices = async () => {
     setLoadingInvoices(true);
@@ -393,7 +709,10 @@ export default function StoreVerifyQuality() {
         return;
       }
       const soData = soSnap.data();
-      if (soData.soStatus === "ready_for_dispatch" || soData.soStatus === "complete") {
+      if (
+        soData.soStatus === "ready_for_dispatch" ||
+        soData.soStatus === "complete"
+      ) {
         alert("⚠️ This SO has already been approved. Refreshing list...");
         await fetchPendingSalesOrders();
         setLoadingSO2(false);
@@ -405,7 +724,8 @@ export default function StoreVerifyQuality() {
       const mappedItems = await Promise.all(
         soItemsRaw.map(async (item) => {
           const productCode = item.productCode?.toString().trim();
-          let stockAvailable = 0, stockDocId = null;
+          let stockAvailable = 0,
+            stockDocId = null;
           if (productCode) {
             const stockQ = query(
               collection(db, "stock"),
@@ -413,7 +733,10 @@ export default function StoreVerifyQuality() {
             );
             const stockSnap = await getDocs(stockQ);
             if (!stockSnap.empty) {
-              stockAvailable = Math.max(0, stockSnap.docs[0].data().available || 0);
+              stockAvailable = Math.max(
+                0,
+                stockSnap.docs[0].data().available || 0,
+              );
               stockDocId = stockSnap.docs[0].id;
             }
           }
@@ -423,7 +746,9 @@ export default function StoreVerifyQuality() {
           const savedReadyQty = item.soQcReadyQty ?? null;
           const defaultReadyQty = Math.min(orderedQty, stockAvailable);
           const readyQty =
-            isReopen && savedReadyQty !== null ? savedReadyQty : defaultReadyQty;
+            isReopen && savedReadyQty !== null
+              ? savedReadyQty
+              : defaultReadyQty;
           return {
             ...item,
             orderedQty,
@@ -480,7 +805,8 @@ export default function StoreVerifyQuality() {
     if (soItems.length === 0) return "pending";
     const statuses = soItems.map((i) => getSoItemStatus(i));
     if (statuses.every((s) => s === "complete")) return "complete";
-    if (statuses.some((s) => s === "partial" || s === "complete")) return "partial";
+    if (statuses.some((s) => s === "partial" || s === "complete"))
+      return "partial";
     return "pending";
   })();
 
@@ -496,7 +822,9 @@ export default function StoreVerifyQuality() {
       const now = new Date().toISOString();
       const currentItems = soItemsRef.current;
       const hasIssues = currentItems.some((i) => i.issue && i.issue !== "");
-      const allComplete = currentItems.every((i) => getSoItemStatus(i) === "complete");
+      const allComplete = currentItems.every(
+        (i) => getSoItemStatus(i) === "complete",
+      );
       const updatedItems = currentItems.map((item) => ({
         ...item,
         soQcReadyQty: item.readyQty ?? 0,
@@ -515,7 +843,8 @@ export default function StoreVerifyQuality() {
       await updateDoc(doc(db, "excelupload", selectedSO.id), {
         items: updatedItems,
         soStatus: newSoStatus,
-        soQcStatus: allComplete && qualityCheck !== "failed" ? "approved" : "issues",
+        soQcStatus:
+          allComplete && qualityCheck !== "failed" ? "approved" : "issues",
         soQcApprovedAt: now,
         soQcApprovedBy: "Store Team",
         soQcRemarks: remarks,
@@ -661,7 +990,10 @@ export default function StoreVerifyQuality() {
           const alreadyReceived = poItem.totalReceivedQty || 0;
           const orderedQty = poItem.orderedQty || poItem.quantity || 0;
           const physicalQty =
-            invItem?.physicalQty ?? invItem?.newReceived ?? invItem?.invoiceQty ?? 0;
+            invItem?.physicalQty ??
+            invItem?.newReceived ??
+            invItem?.invoiceQty ??
+            0;
           return {
             ...poItem,
             alreadyReceived,
@@ -769,7 +1101,10 @@ export default function StoreVerifyQuality() {
   const getUsableQty = (item) => item.physicalQty ?? item.newReceived ?? 0;
 
   const getTotalNewReceived = () =>
-    receivedItems.reduce((s, i) => s + (i.physicalQty ?? i.newReceived ?? 0), 0);
+    receivedItems.reduce(
+      (s, i) => s + (i.physicalQty ?? i.newReceived ?? 0),
+      0,
+    );
 
   const getTotalShortage = () =>
     receivedItems.reduce((sum, item) => {
@@ -801,7 +1136,8 @@ export default function StoreVerifyQuality() {
     try {
       const now = new Date().toISOString();
       const hasDamage = receivedItems.some((i) => (i.damagedQty || 0) > 0);
-      const isReplacement = selectedInvoice.storeQcStatus === "approved_with_issues";
+      const isReplacement =
+        selectedInvoice.storeQcStatus === "approved_with_issues";
       const updatedItems = receivedItems.map((item) => {
         const orderedQty = item.orderedQty || 0;
         const alreadyReceived = item.alreadyReceived || 0;
@@ -826,9 +1162,14 @@ export default function StoreVerifyQuality() {
           totalReceivedQty: i.totalReceivedQty,
         })),
       );
-      const totalReceivedQty = updatedItems.reduce((s, i) => s + i.totalReceivedQty, 0);
+      const totalReceivedQty = updatedItems.reduce(
+        (s, i) => s + i.totalReceivedQty,
+        0,
+      );
       const finalQcStatus =
-        hasDamage && qualityCheck === "passed" ? "passed_with_issues" : qualityCheck;
+        hasDamage && qualityCheck === "passed"
+          ? "passed_with_issues"
+          : qualityCheck;
       await updateDoc(doc(db, "excelupload", selectedPO.id), {
         items: updatedItems,
         poStatus: isReplacement ? "complete" : poStatus,
@@ -837,7 +1178,8 @@ export default function StoreVerifyQuality() {
         totalReceivedQty,
         qualityCheck: finalQcStatus,
         remarks,
-        storeQcStatus: qualityCheck === "passed" ? "approved" : "approved_with_issues",
+        storeQcStatus:
+          qualityCheck === "passed" ? "approved" : "approved_with_issues",
         storeQcApprovedAt: now,
         storeQcApprovedBy: "Store Team",
         storeQcPending: false,
@@ -858,10 +1200,21 @@ export default function StoreVerifyQuality() {
         items: updatedItems,
       });
       if (qualityCheck !== "failed") {
-        await addToStock(receivedItems, selectedPO.poNumber, selectedPO.vendor, isReplacement);
+        await addToStock(
+          receivedItems,
+          selectedPO.poNumber,
+          selectedPO.vendor,
+          isReplacement,
+        );
         for (const item of receivedItems) {
           const key = item.productCode?.toString().trim();
-          if (!key || !item.issue || item.issue === "" || item.issue === "damage") continue;
+          if (
+            !key ||
+            !item.issue ||
+            item.issue === "" ||
+            item.issue === "damage"
+          )
+            continue;
           const stockSnap = await getDocs(
             query(collection(db, "stock"), where("productCode", "==", key)),
           );
@@ -925,7 +1278,7 @@ export default function StoreVerifyQuality() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-black text-slate-800">Store Quality Check</h2>
           <p className="text-xs text-slate-400 mt-0.5">
@@ -933,8 +1286,51 @@ export default function StoreVerifyQuality() {
           </p>
         </div>
         <BtnSecondary onClick={() => navigate("/store/dashboard")}>Cancel</BtnSecondary>
-      </div>
+      </div> */}
 
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-black text-slate-800">
+            Store Quality Check
+          </h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Review vendor invoices and approve material receipt
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Print button — Step 2 માં SO અથવા PO select હોય ત્યારે જ દેખાય */}
+          {step === 2 &&
+            qcMode === "so" &&
+            selectedSO &&
+            selectedSO.soStatus !== "ready_for_dispatch" &&
+            selectedSO.soStatus !== "complete" && (
+              <button
+                onClick={handlePrintSO}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border border-slate-300 text-slate-600 bg-white hover:bg-slate-50 transition-all"
+              >
+                <FiPrinter size={14} /> Print SO
+              </button>
+            )}
+          {step === 2 &&
+            qcMode === "po" &&
+            selectedPO &&
+            selectedInvoice &&
+            selectedInvoice.storeQcStatus !== "approved" && (
+              <button
+                onClick={handlePrintPO}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border border-slate-300 text-slate-600 bg-white hover:bg-slate-50 transition-all"
+              >
+                <FiPrinter size={14} /> Print PO
+              </button>
+            )}
+
+          <BtnSecondary onClick={() => navigate("/store/dashboard")}>
+            Cancel
+          </BtnSecondary>
+        </div>
+      </div>
       {/* Step Indicator — hide on approved read-only PO view */}
       {step < 4 && !isApprovedPOView && (
         <Card className="p-5">
@@ -990,7 +1386,9 @@ export default function StoreVerifyQuality() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => {
-                        const d2 = JSON.parse(localStorage.getItem("storeQcDraft"));
+                        const d2 = JSON.parse(
+                          localStorage.getItem("storeQcDraft"),
+                        );
                         setStep(d2.step);
                         setSelectedInvoice(d2.selectedInvoice);
                         setSelectedPO(d2.selectedPO);
@@ -1059,25 +1457,34 @@ export default function StoreVerifyQuality() {
 
           {/* Details Card */}
           <Card>
-            <CardHeader title="Invoice Details" subtitle="Read only — QC complete" />
+            <CardHeader
+              title="Invoice Details"
+              subtitle="Read only — QC complete"
+            />
             <div className="p-6 space-y-4">
               {/* Info grid */}
               <div className="p-4 bg-slate-50 rounded-lg">
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <p className="text-slate-400 font-bold mb-1">PO Number</p>
-                    <p className="text-slate-800 font-bold">{selectedPO.poNumber}</p>
+                    <p className="text-slate-800 font-bold">
+                      {selectedPO.poNumber}
+                    </p>
                   </div>
                   <div>
                     <p className="text-slate-400 font-bold mb-1">Invoice No</p>
-                    <p className="text-slate-800 font-bold">{invoiceNo || "—"}</p>
+                    <p className="text-slate-800 font-bold">
+                      {invoiceNo || "—"}
+                    </p>
                   </div>
                   <div>
                     <p className="text-slate-400 font-bold mb-1">Vendor</p>
                     <p className="text-slate-800">{selectedPO.vendor}</p>
                   </div>
                   <div>
-                    <p className="text-slate-400 font-bold mb-1">Invoice Date</p>
+                    <p className="text-slate-400 font-bold mb-1">
+                      Invoice Date
+                    </p>
                     <p className="text-slate-800">
                       {invoiceDate
                         ? new Date(invoiceDate).toLocaleDateString("en-IN", {
@@ -1101,7 +1508,9 @@ export default function StoreVerifyQuality() {
                 </div>
                 {remarks && (
                   <div className="mt-3 pt-3 border-t border-slate-200">
-                    <p className="text-slate-400 font-bold text-xs mb-1">Remarks</p>
+                    <p className="text-slate-400 font-bold text-xs mb-1">
+                      Remarks
+                    </p>
                     <p className="text-xs text-slate-600">{remarks}</p>
                   </div>
                 )}
@@ -1136,7 +1545,10 @@ export default function StoreVerifyQuality() {
                         <span className="w-28 font-mono font-bold text-slate-700 flex-shrink-0 truncate">
                           {item.productCode}
                         </span>
-                        <span className="flex-1 text-slate-500 truncate" title={item.description}>
+                        <span
+                          className="flex-1 text-slate-500 truncate"
+                          title={item.description}
+                        >
                           {item.description}
                         </span>
                         <span className="text-slate-500 flex-shrink-0">
@@ -1207,21 +1619,32 @@ export default function StoreVerifyQuality() {
               </div>
             </div>
             <Card>
-              <CardHeader title="Sales Order Details" subtitle="Read only — QC complete" />
+              <CardHeader
+                title="Sales Order Details"
+                subtitle="Read only — QC complete"
+              />
               <div className="p-6 space-y-4">
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
                       <p className="text-slate-400 font-bold mb-1">SO Number</p>
-                      <p className="text-slate-800 font-bold">{selectedSO.soNumber}</p>
+                      <p className="text-slate-800 font-bold">
+                        {selectedSO.soNumber}
+                      </p>
                     </div>
                     <div>
                       <p className="text-slate-400 font-bold mb-1">Customer</p>
-                      <p className="text-slate-800 font-bold">{selectedSO.customer}</p>
+                      <p className="text-slate-800 font-bold">
+                        {selectedSO.customer}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-slate-400 font-bold mb-1">Delivery Date</p>
-                      <p className="text-slate-800">{selectedSO.deliveryDate || "—"}</p>
+                      <p className="text-slate-400 font-bold mb-1">
+                        Delivery Date
+                      </p>
+                      <p className="text-slate-800">
+                        {selectedSO.deliveryDate || "—"}
+                      </p>
                     </div>
                     <div>
                       <p className="text-slate-400 font-bold mb-1">Status</p>
@@ -1239,9 +1662,15 @@ export default function StoreVerifyQuality() {
                         key={idx}
                         className="flex items-center text-xs px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-100 gap-3"
                       >
-                        <span className="w-6 font-bold text-slate-500">{idx + 1}.</span>
-                        <span className="w-28 font-mono text-slate-700">{item.productCode}</span>
-                        <span className="flex-1 text-slate-500 truncate">{item.description}</span>
+                        <span className="w-6 font-bold text-slate-500">
+                          {idx + 1}.
+                        </span>
+                        <span className="w-28 font-mono text-slate-700">
+                          {item.productCode}
+                        </span>
+                        <span className="flex-1 text-slate-500 truncate">
+                          {item.description}
+                        </span>
                         <span className="text-slate-500">
                           {item.orderedQty} {item.unit || "pcs"}
                         </span>
@@ -1283,33 +1712,47 @@ export default function StoreVerifyQuality() {
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
                       <p className="text-slate-400 font-bold mb-1">SO Number</p>
-                      <p className="text-slate-800 font-bold">{selectedSO.soNumber}</p>
+                      <p className="text-slate-800 font-bold">
+                        {selectedSO.soNumber}
+                      </p>
                     </div>
                     <div>
                       <p className="text-slate-400 font-bold mb-1">Customer</p>
                       <p className="text-slate-800">{selectedSO.customer}</p>
                     </div>
                     <div>
-                      <p className="text-slate-400 font-bold mb-1">Delivery Date</p>
-                      <p className="text-slate-800">{selectedSO.deliveryDate || "—"}</p>
+                      <p className="text-slate-400 font-bold mb-1">
+                        Delivery Date
+                      </p>
+                      <p className="text-slate-800">
+                        {selectedSO.deliveryDate || "—"}
+                      </p>
                     </div>
                     <div>
                       <p className="text-slate-400 font-bold mb-1">After QC</p>
                       <StatusPill
-                        status={liveSoStatus === "complete" ? "ready" : liveSoStatus}
+                        status={
+                          liveSoStatus === "complete" ? "ready" : liveSoStatus
+                        }
                       />
                     </div>
                   </div>
                 </div>
                 <div className="p-3 bg-slate-50 rounded-lg space-y-1.5 text-xs">
-                  <p className="text-xs font-bold text-slate-600 mb-2">QC Summary:</p>
+                  <p className="text-xs font-bold text-slate-600 mb-2">
+                    QC Summary:
+                  </p>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Total Items:</span>
-                    <span className="font-bold text-slate-800">{soItems.length}</span>
+                    <span className="font-bold text-slate-800">
+                      {soItems.length}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Ready for Dispatch:</span>
-                    <span className="font-bold text-emerald-600">{soTotalReady} units</span>
+                    <span className="font-bold text-emerald-600">
+                      {soTotalReady} units
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Shortage:</span>
@@ -1322,18 +1765,27 @@ export default function StoreVerifyQuality() {
                   <div className="flex justify-between">
                     <span className="text-slate-500">SO Status After:</span>
                     <StatusPill
-                      status={liveSoStatus === "complete" ? "ready" : liveSoStatus}
+                      status={
+                        liveSoStatus === "complete" ? "ready" : liveSoStatus
+                      }
                     />
                   </div>
                 </div>
                 {soItems.some((i) => i._hadIssue) && (
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="text-xs font-bold text-amber-700 mb-2">⚠️ Previous Issues:</p>
+                    <p className="text-xs font-bold text-amber-700 mb-2">
+                      ⚠️ Previous Issues:
+                    </p>
                     {soItems
                       .filter((i) => i._hadIssue)
                       .map((item, i) => (
-                        <div key={i} className="text-xs text-amber-800 flex gap-2 mt-1">
-                          <span className="font-mono font-bold">{item.productCode}</span>
+                        <div
+                          key={i}
+                          className="text-xs text-amber-800 flex gap-2 mt-1"
+                        >
+                          <span className="font-mono font-bold">
+                            {item.productCode}
+                          </span>
                           <span className="capitalize text-amber-600">
                             — {item._lastIssue?.replace("_", " ")}
                           </span>
@@ -1342,10 +1794,13 @@ export default function StoreVerifyQuality() {
                   </div>
                 )}
                 <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <FiAlertCircle size={13} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                  <FiAlertCircle
+                    size={13}
+                    className="text-blue-500 mt-0.5 flex-shrink-0"
+                  />
                   <p className="text-xs text-blue-700">
-                    Set "Ready Qty" = actual units you can dispatch from stock. Shortage items will
-                    stay in QC list.
+                    Set "Ready Qty" = actual units you can dispatch from stock.
+                    Shortage items will stay in QC list.
                   </p>
                 </div>
               </div>
@@ -1360,30 +1815,46 @@ export default function StoreVerifyQuality() {
                 <table className="w-full text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b-2 border-slate-200">
-                      <th className="text-left px-3 py-2.5 font-bold text-slate-500 uppercase tracking-wide w-8">#</th>
-                      <th className="text-left px-3 py-2.5 font-bold text-slate-500 uppercase tracking-wide w-28">Part No</th>
-                      <th className="text-left px-3 py-2.5 font-bold text-slate-500 uppercase tracking-wide">Description</th>
-                      <th className="text-center px-3 py-2.5 font-bold text-slate-500 uppercase tracking-wide w-14">Unit</th>
-                      <th className="text-center px-3 py-2.5 font-bold text-slate-500 uppercase tracking-wide w-20">Phy Qty</th>
+                      <th className="text-left px-3 py-2.5 font-bold text-slate-500 uppercase tracking-wide w-8">
+                        #
+                      </th>
+                      <th className="text-left px-3 py-2.5 font-bold text-slate-500 uppercase tracking-wide w-28">
+                        Part No
+                      </th>
+                      <th className="text-left px-3 py-2.5 font-bold text-slate-500 uppercase tracking-wide">
+                        Description
+                      </th>
+                      <th className="text-center px-3 py-2.5 font-bold text-slate-500 uppercase tracking-wide w-14">
+                        Unit
+                      </th>
+                      <th className="text-center px-3 py-2.5 font-bold text-slate-500 uppercase tracking-wide w-20">
+                        Phy Qty
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {soItems.map((item, idx) => {
                       const ordered = item.orderedQty || 0;
                       const avail = item.stockAvailable || 0;
-                      const readyQty = item.readyQty ?? Math.min(ordered, avail);
+                      const readyQty =
+                        item.readyQty ?? Math.min(ordered, avail);
                       const isShort = readyQty < ordered;
                       return (
                         <tr
                           key={item.productCode}
                           className={`transition-colors ${isShort ? "bg-orange-50/50" : "hover:bg-slate-50"}`}
                         >
-                          <td className="px-3 py-2.5 text-slate-400 font-bold">{idx + 1}</td>
+                          <td className="px-3 py-2.5 text-slate-400 font-bold">
+                            {idx + 1}
+                          </td>
                           <td className="px-3 py-2.5 font-mono font-bold text-slate-800 whitespace-nowrap">
                             {item.productCode}
                           </td>
                           <td className="px-3 py-2.5 text-slate-600">
-                            <span className="block max-w-[180px] truncate" title={item.description}>
+                            <span
+                              className="block max-w-[180px] truncate"
+                              title={item.description}
+                            >
                               {item.description}
                             </span>
                           </td>
@@ -1394,7 +1865,8 @@ export default function StoreVerifyQuality() {
                             <QtyInput
                               initialValue={readyQty}
                               onChange={(newReady) => {
-                                const autoIssue = newReady < ordered ? "shortage" : "";
+                                const autoIssue =
+                                  newReady < ordered ? "shortage" : "";
                                 const autoDetail =
                                   newReady < ordered
                                     ? `Short: ${ordered - newReady} units`
@@ -1402,9 +1874,13 @@ export default function StoreVerifyQuality() {
                                 updateSoItem(item.productCode, {
                                   readyQty: newReady,
                                   issue:
-                                    item.issue === "damage" ? item.issue : autoIssue,
+                                    item.issue === "damage"
+                                      ? item.issue
+                                      : autoIssue,
                                   issueDetail:
-                                    item.issue === "damage" ? item.issueDetail : autoDetail,
+                                    item.issue === "damage"
+                                      ? item.issueDetail
+                                      : autoDetail,
                                   ...(item.issue === "damage" && {
                                     damagedQty: Math.max(0, ordered - newReady),
                                   }),
@@ -1420,8 +1896,8 @@ export default function StoreVerifyQuality() {
                 {soTotalShortage > 0 && (
                   <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
                     <p className="text-xs font-bold text-orange-700 flex items-center gap-1.5">
-                      <FiAlertTriangle size={12} /> {soTotalShortage} units short — SO will stay in
-                      QC list
+                      <FiAlertTriangle size={12} /> {soTotalShortage} units
+                      short — SO will stay in QC list
                     </p>
                   </div>
                 )}
@@ -1444,38 +1920,57 @@ export default function StoreVerifyQuality() {
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
                       <p className="text-slate-400 font-bold mb-1">PO Number</p>
-                      <p className="text-slate-800 font-bold">{selectedPO.poNumber}</p>
+                      <p className="text-slate-800 font-bold">
+                        {selectedPO.poNumber}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-slate-400 font-bold mb-1">Invoice No</p>
-                      <p className="text-slate-800 font-bold">{invoiceNo || "—"}</p>
+                      <p className="text-slate-400 font-bold mb-1">
+                        Invoice No
+                      </p>
+                      <p className="text-slate-800 font-bold">
+                        {invoiceNo || "—"}
+                      </p>
                     </div>
                     <div>
                       <p className="text-slate-400 font-bold mb-1">Vendor</p>
                       <p className="text-slate-800">{selectedPO.vendor}</p>
                     </div>
                     <div>
-                      <p className="text-slate-400 font-bold mb-1">Invoice Date</p>
-                      <p className="text-slate-800">{invoiceDate ? formatDate(invoiceDate) : "—"}</p>
+                      <p className="text-slate-400 font-bold mb-1">
+                        Invoice Date
+                      </p>
+                      <p className="text-slate-800">
+                        {invoiceDate ? formatDate(invoiceDate) : "—"}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-slate-400 font-bold mb-1">Current PO Status</p>
+                      <p className="text-slate-400 font-bold mb-1">
+                        Current PO Status
+                      </p>
                       <StatusPill status={selectedPO.status} />
                     </div>
                     <div>
-                      <p className="text-slate-400 font-bold mb-1">After Approval</p>
+                      <p className="text-slate-400 font-bold mb-1">
+                        After Approval
+                      </p>
                       <StatusPill status={livePoStatus} />
                     </div>
                   </div>
                 </div>
                 <div className="p-3 bg-slate-50 rounded-lg">
-                  <p className="text-xs font-bold text-slate-600 mb-2">Receipt Summary:</p>
+                  <p className="text-xs font-bold text-slate-600 mb-2">
+                    Receipt Summary:
+                  </p>
                   <div className="space-y-1.5 text-xs">
                     <div className="flex justify-between">
                       <span className="text-slate-500">Items in Invoice:</span>
                       <span className="font-bold text-slate-800">
-                        {receivedItems.filter((i) => i.matchedFromInvoice).length} /{" "}
-                        {receivedItems.length}
+                        {
+                          receivedItems.filter((i) => i.matchedFromInvoice)
+                            .length
+                        }{" "}
+                        / {receivedItems.length}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -1485,7 +1980,9 @@ export default function StoreVerifyQuality() {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500">Still Pending After:</span>
+                      <span className="text-slate-500">
+                        Still Pending After:
+                      </span>
                       <span
                         className={`font-bold ${getTotalShortage() > 0 ? "text-orange-600" : "text-emerald-600"}`}
                       >
@@ -1493,16 +1990,21 @@ export default function StoreVerifyQuality() {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500">PO Status After Approval:</span>
+                      <span className="text-slate-500">
+                        PO Status After Approval:
+                      </span>
                       <StatusPill status={livePoStatus} />
                     </div>
                   </div>
                 </div>
                 <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <FiAlertCircle size={13} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                  <FiAlertCircle
+                    size={13}
+                    className="text-blue-500 mt-0.5 flex-shrink-0"
+                  />
                   <p className="text-xs text-blue-700">
-                    Quantities are pre-filled from the invoice. Edit "Physical" = actual healthy
-                    units received.
+                    Quantities are pre-filled from the invoice. Edit "Physical"
+                    = actual healthy units received.
                   </p>
                 </div>
               </div>
@@ -1515,7 +2017,9 @@ export default function StoreVerifyQuality() {
               <div className="p-6 space-y-3 max-h-[70vh] overflow-y-auto">
                 {pagedItems.map((item) => {
                   const currentItem =
-                    receivedItems.find((r) => r.productCode === item.productCode) || item;
+                    receivedItems.find(
+                      (r) => r.productCode === item.productCode,
+                    ) || item;
                   const ordered = currentItem.orderedQty || 0;
                   const already = currentItem.alreadyReceived || 0;
                   const thisInv = currentItem.newReceived || 0;
@@ -1525,14 +2029,17 @@ export default function StoreVerifyQuality() {
                   const excess = Math.max(0, totalAfter - ordered);
                   const itemStatus = getItemStatus(ordered, totalAfter);
                   const progressPct =
-                    ordered > 0 ? Math.min(100, Math.round((totalAfter / ordered) * 100)) : 0;
+                    ordered > 0
+                      ? Math.min(100, Math.round((totalAfter / ordered) * 100))
+                      : 0;
                   return (
                     <div
                       key={currentItem.productCode}
                       className={`p-4 border rounded-lg ${
                         currentItem._hadIssue && currentItem.issue === "damage"
                           ? "border-red-400 bg-red-50/30 ring-1 ring-red-300"
-                          : currentItem._hadIssue && currentItem.issue === "shortage"
+                          : currentItem._hadIssue &&
+                              currentItem.issue === "shortage"
                             ? "border-orange-400 bg-orange-50/30 ring-1 ring-orange-300"
                             : currentItem._hadIssue
                               ? "border-amber-400 bg-amber-50/30"
@@ -1546,7 +2053,10 @@ export default function StoreVerifyQuality() {
                       }`}
                     >
                       <div className="flex items-start gap-3 mb-3">
-                        <FiPackage className="text-slate-400 mt-0.5 flex-shrink-0" size={15} />
+                        <FiPackage
+                          className="text-slate-400 mt-0.5 flex-shrink-0"
+                          size={15}
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="text-sm font-bold text-slate-800 font-mono">
@@ -1574,7 +2084,9 @@ export default function StoreVerifyQuality() {
                             Ordered
                           </p>
                           <div className="h-8 flex items-center px-2 bg-slate-50 border border-slate-200 rounded-lg">
-                            <p className="text-sm font-bold text-slate-800">{ordered}</p>
+                            <p className="text-sm font-bold text-slate-800">
+                              {ordered}
+                            </p>
                           </div>
                         </div>
                         <div>
@@ -1600,7 +2112,8 @@ export default function StoreVerifyQuality() {
                               const newPhys = parseFloat(e.target.value) || 0;
                               const inv = currentItem.newReceived || 0;
                               const issue = currentItem.issue;
-                              const autoIssue = !issue && newPhys < inv ? "shortage" : issue;
+                              const autoIssue =
+                                !issue && newPhys < inv ? "shortage" : issue;
                               const autoDamaged =
                                 autoIssue === "damage"
                                   ? Math.max(0, inv - newPhys)
@@ -1636,7 +2149,9 @@ export default function StoreVerifyQuality() {
                               const inv = currentItem.newReceived || 0;
                               const phys2 = currentItem.physicalQty ?? inv;
                               const autoDamaged =
-                                newIssue === "damage" ? Math.max(0, inv - phys2) : 0;
+                                newIssue === "damage"
+                                  ? Math.max(0, inv - phys2)
+                                  : 0;
                               const autoDetail =
                                 newIssue === "damage"
                                   ? `Damaged: ${autoDamaged} units`
@@ -1696,7 +2211,9 @@ export default function StoreVerifyQuality() {
                       )}
                       {currentItem.issue && currentItem.issue !== "damage" && (
                         <div className="mt-1 mb-2">
-                          <p className="text-[10px] text-red-500 font-bold mb-1">Issue Details</p>
+                          <p className="text-[10px] text-red-500 font-bold mb-1">
+                            Issue Details
+                          </p>
                           <textarea
                             rows={2}
                             value={currentItem.issueDetail || ""}
@@ -1733,12 +2250,14 @@ export default function StoreVerifyQuality() {
                       </div>
                       {itemStatus === "partial" && remaining > 0 && (
                         <p className="text-[11px] text-orange-600 font-bold mt-1.5 flex items-center gap-1">
-                          <FiAlertTriangle size={10} /> {remaining} {currentItem.unit} still pending
+                          <FiAlertTriangle size={10} /> {remaining}{" "}
+                          {currentItem.unit} still pending
                         </p>
                       )}
                       {itemStatus === "excess" && (
                         <p className="text-[11px] text-purple-600 font-bold mt-1.5 flex items-center gap-1">
-                          <FiAlertTriangle size={10} /> {excess} {currentItem.unit} excess received
+                          <FiAlertTriangle size={10} /> {excess}{" "}
+                          {currentItem.unit} excess received
                         </p>
                       )}
                     </div>
@@ -1748,32 +2267,41 @@ export default function StoreVerifyQuality() {
                   <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                     <p className="text-xs text-slate-400">
                       Showing {(currentPage - 1) * itemsPerPage + 1}–
-                      {Math.min(currentPage * itemsPerPage, receivedItems.length)} of{" "}
-                      {receivedItems.length} items
+                      {Math.min(
+                        currentPage * itemsPerPage,
+                        receivedItems.length,
+                      )}{" "}
+                      of {receivedItems.length} items
                     </p>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
                         disabled={currentPage === 1}
                         className="px-2.5 py-1 text-xs font-bold border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-100"
                       >
                         ← Prev
                       </button>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                        <button
-                          key={pg}
-                          onClick={() => setCurrentPage(pg)}
-                          className={`w-7 h-7 text-xs font-bold rounded-lg transition-colors ${
-                            pg === currentPage
-                              ? "bg-emerald-600 text-white"
-                              : "border border-slate-200 hover:bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          {pg}
-                        </button>
-                      ))}
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                        (pg) => (
+                          <button
+                            key={pg}
+                            onClick={() => setCurrentPage(pg)}
+                            className={`w-7 h-7 text-xs font-bold rounded-lg transition-colors ${
+                              pg === currentPage
+                                ? "bg-emerald-600 text-white"
+                                : "border border-slate-200 hover:bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {pg}
+                          </button>
+                        ),
+                      )}
                       <button
-                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(totalPages, p + 1))
+                        }
                         disabled={currentPage === totalPages}
                         className="px-2.5 py-1 text-xs font-bold border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-100"
                       >
@@ -1870,20 +2398,29 @@ export default function StoreVerifyQuality() {
             </div>
           </Card>
           <Card>
-            <CardHeader title="Confirm Summary" subtitle="Review before final approval" />
+            <CardHeader
+              title="Confirm Summary"
+              subtitle="Review before final approval"
+            />
             <div className="p-6 space-y-4">
               <div className="p-4 bg-slate-50 rounded-xl space-y-2.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-slate-500">SO Number</span>
-                  <span className="font-black text-slate-800">{selectedSO.soNumber}</span>
+                  <span className="font-black text-slate-800">
+                    {selectedSO.soNumber}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Customer</span>
-                  <span className="font-semibold text-slate-800">{selectedSO.customer}</span>
+                  <span className="font-semibold text-slate-800">
+                    {selectedSO.customer}
+                  </span>
                 </div>
                 <div className="border-t border-slate-200 pt-2 flex justify-between">
                   <span className="text-slate-500">Units ready</span>
-                  <span className="font-black text-slate-800 text-sm">{soTotalReady} units</span>
+                  <span className="font-black text-slate-800 text-sm">
+                    {soTotalReady} units
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Shortage</span>
@@ -1898,12 +2435,24 @@ export default function StoreVerifyQuality() {
                 <table className="w-full text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="text-left px-3 py-2 font-bold text-slate-500 uppercase w-8">#</th>
-                      <th className="text-left px-3 py-2 font-bold text-slate-500 uppercase">Part No</th>
-                      <th className="text-left px-3 py-2 font-bold text-slate-500 uppercase">Description</th>
-                      <th className="text-center px-3 py-2 font-bold text-slate-500 uppercase w-14">Unit</th>
-                      <th className="text-center px-3 py-2 font-bold text-slate-500 uppercase w-16">Ready</th>
-                      <th className="text-center px-3 py-2 font-bold text-slate-500 uppercase w-20">Status</th>
+                      <th className="text-left px-3 py-2 font-bold text-slate-500 uppercase w-8">
+                        #
+                      </th>
+                      <th className="text-left px-3 py-2 font-bold text-slate-500 uppercase">
+                        Part No
+                      </th>
+                      <th className="text-left px-3 py-2 font-bold text-slate-500 uppercase">
+                        Description
+                      </th>
+                      <th className="text-center px-3 py-2 font-bold text-slate-500 uppercase w-14">
+                        Unit
+                      </th>
+                      <th className="text-center px-3 py-2 font-bold text-slate-500 uppercase w-16">
+                        Ready
+                      </th>
+                      <th className="text-center px-3 py-2 font-bold text-slate-500 uppercase w-20">
+                        Status
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1912,13 +2461,20 @@ export default function StoreVerifyQuality() {
                       const st = getSoItemStatus(item);
                       const isShort = st !== "complete";
                       return (
-                        <tr key={item.productCode} className={isShort ? "bg-orange-50/40" : ""}>
-                          <td className="px-3 py-2 text-slate-400 font-bold">{idx + 1}</td>
+                        <tr
+                          key={item.productCode}
+                          className={isShort ? "bg-orange-50/40" : ""}
+                        >
+                          <td className="px-3 py-2 text-slate-400 font-bold">
+                            {idx + 1}
+                          </td>
                           <td className="px-3 py-2 font-mono font-bold text-slate-800 whitespace-nowrap">
                             {item.productCode}
                           </td>
                           <td className="px-3 py-2 text-slate-600">
-                            <span className="block max-w-[140px] truncate">{item.description}</span>
+                            <span className="block max-w-[140px] truncate">
+                              {item.description}
+                            </span>
                           </td>
                           <td className="px-3 py-2 text-center text-slate-500">
                             {item.unit || "pcs"}
@@ -2044,38 +2600,50 @@ export default function StoreVerifyQuality() {
                   }`}
                 />
               </div>
-              {receivedItems.some((i) => i.issue) && qualityCheck !== "passed" && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                  <p className="text-xs font-bold text-amber-700 mb-2">
-                    ⚠️ Items with Issues Noted:
-                  </p>
-                  {receivedItems
-                    .filter((i) => i.issue)
-                    .map((item, i) => (
-                      <div key={i} className="flex items-start gap-2 text-xs text-amber-800 mt-1">
-                        <span className="font-bold font-mono flex-shrink-0">{item.productCode}</span>
-                        <span className="text-amber-600 capitalize">
-                          — {item.issue.replace("_", " ")}
-                          {(item.damagedQty || 0) > 0 && (
-                            <span className="text-red-600 font-bold ml-1">
-                              ({item.damagedQty} tracked)
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              )}
+              {receivedItems.some((i) => i.issue) &&
+                qualityCheck !== "passed" && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                    <p className="text-xs font-bold text-amber-700 mb-2">
+                      ⚠️ Items with Issues Noted:
+                    </p>
+                    {receivedItems
+                      .filter((i) => i.issue)
+                      .map((item, i) => (
+                        <div
+                          key={i}
+                          className="flex items-start gap-2 text-xs text-amber-800 mt-1"
+                        >
+                          <span className="font-bold font-mono flex-shrink-0">
+                            {item.productCode}
+                          </span>
+                          <span className="text-amber-600 capitalize">
+                            — {item.issue.replace("_", " ")}
+                            {(item.damagedQty || 0) > 0 && (
+                              <span className="text-red-600 font-bold ml-1">
+                                ({item.damagedQty} tracked)
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                )}
               {qualityCheck === "failed" ? (
                 <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-xl">
-                  <FiAlertTriangle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
+                  <FiAlertTriangle
+                    size={14}
+                    className="text-red-500 mt-0.5 flex-shrink-0"
+                  />
                   <p className="text-xs text-red-700">
                     <strong>Stock will NOT be updated.</strong>
                   </p>
                 </div>
               ) : qualityCheck === "passed_with_issues" ? (
                 <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                  <FiAlertTriangle size={14} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                  <FiAlertTriangle
+                    size={14}
+                    className="text-amber-500 mt-0.5 flex-shrink-0"
+                  />
                   <p className="text-xs text-amber-800">
                     Stock updated. Invoice will{" "}
                     <strong>stay in pending list</strong> for follow-up.
@@ -2083,7 +2651,10 @@ export default function StoreVerifyQuality() {
                 </div>
               ) : (
                 <div className="flex items-start gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-                  <FiCheck size={14} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                  <FiCheck
+                    size={14}
+                    className="text-emerald-600 mt-0.5 flex-shrink-0"
+                  />
                   <p className="text-xs text-emerald-800">
                     After approval:{" "}
                     <strong>stock will be updated immediately</strong>.
@@ -2093,11 +2664,18 @@ export default function StoreVerifyQuality() {
             </div>
           </Card>
           <Card>
-            <CardHeader title="Confirm Summary" subtitle="Review before final approval" />
+            <CardHeader
+              title="Confirm Summary"
+              subtitle="Review before final approval"
+            />
             <div className="p-6 space-y-4">
               <div className="p-4 bg-slate-50 rounded-xl space-y-2.5 text-xs">
                 {[
-                  { label: "PO Number", value: selectedPO.poNumber, bold: true },
+                  {
+                    label: "PO Number",
+                    value: selectedPO.poNumber,
+                    bold: true,
+                  },
                   { label: "Invoice No", value: invoiceNo, bold: true },
                   { label: "Vendor", value: selectedPO.vendor },
                   {
@@ -2111,9 +2689,14 @@ export default function StoreVerifyQuality() {
                       : "—",
                   },
                 ].map(({ label, value, bold }) => (
-                  <div key={label} className="flex justify-between items-center">
+                  <div
+                    key={label}
+                    className="flex justify-between items-center"
+                  >
                     <span className="text-slate-500">{label}</span>
-                    <span className={`${bold ? "font-black" : "font-semibold"} text-slate-800`}>
+                    <span
+                      className={`${bold ? "font-black" : "font-semibold"} text-slate-800`}
+                    >
                       {value}
                     </span>
                   </div>
@@ -2130,7 +2713,9 @@ export default function StoreVerifyQuality() {
                 </div>
               </div>
               <div>
-                <p className="text-xs font-bold text-slate-600 mb-2 uppercase">Item Breakdown</p>
+                <p className="text-xs font-bold text-slate-600 mb-2 uppercase">
+                  Item Breakdown
+                </p>
                 <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
                   {receivedItems.map((item, i) => {
                     const phys = item.physicalQty ?? item.newReceived ?? 0;
@@ -2154,7 +2739,9 @@ export default function StoreVerifyQuality() {
                             <span className="ml-2 text-red-500 capitalize font-bold">
                               ⚠ {item.issue.replace("_", " ")}
                               {damaged > 0 && (
-                                <span className="ml-1">({damaged} tracked)</span>
+                                <span className="ml-1">
+                                  ({damaged} tracked)
+                                </span>
                               )}
                             </span>
                           )}
@@ -2248,14 +2835,16 @@ export default function StoreVerifyQuality() {
                 ✅ Invoice <strong>{invoiceNo}</strong> approved
               </p>
               <p>
-                ✅ Stock updated with <strong>{getTotalNewReceived()} units</strong>
+                ✅ Stock updated with{" "}
+                <strong>{getTotalNewReceived()} units</strong>
               </p>
               <p>
                 ✅ Quality check: <strong>{qualityCheck}</strong>
               </p>
               {getTotalShortage() > 0 && (
                 <p className="text-orange-600 font-bold">
-                  ⚠️ {getTotalShortage()} units still pending — next invoice required
+                  ⚠️ {getTotalShortage()} units still pending — next invoice
+                  required
                 </p>
               )}
             </div>
@@ -2294,8 +2883,6 @@ export default function StoreVerifyQuality() {
         </Card>
       )}
 
-      {/* ── Navigation Buttons ─────────────────────────────────────────────── */}
-      {/* Only show on editable step 2 — hide on approved PO read-only view and SO read-only view */}
       {step === 2 &&
         !isApprovedPOView &&
         !(
@@ -2319,7 +2906,9 @@ export default function StoreVerifyQuality() {
             >
               ← Back
             </BtnSecondary>
-            <BtnPrimary onClick={() => setStep(3)}>Next: Quality Check →</BtnPrimary>
+            <BtnPrimary onClick={() => setStep(3)}>
+              Next: Quality Check →
+            </BtnPrimary>
           </div>
         )}
 
