@@ -341,9 +341,9 @@ export default function StoreVerifyQuality() {
       '<th style="padding:15px 10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:40px;">#</th>',
       '<th style="padding:10px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;">Part No</th>',
       '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;">Description</th>',
-      '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:60px;">Unit</th>',
-      '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:80px;">Ordered</th>',
-      '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:80px;">Ready</th>',
+      '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;width:80px;">Unit</th>',
+      '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;width:100px;">Ordered</th>',
+      // '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;width:80px;">Ready</th>',
       "</tr>",
       "</thead>",
       "<tbody>",
@@ -364,28 +364,27 @@ export default function StoreVerifyQuality() {
           '<td style="padding:7px 10px;font-size:12px;color:#475569;">' +
             (item.description || "—") +
             "</td>",
-          '<td style="padding:7px 10px;text-align:center;font-size:12px;color:#64748b;">' +
+          '<td style="padding:7px 10px;text-align:left;font-size:12px;color:#64748b;">' +
             (item.unit || "pcs") +
             "</td>",
-          '<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:#1e293b;">' +
+          '<td style="padding:7px 10px;text-align:left;font-size:12px;font-weight:700;color:#1e293b;">' +
             ordered +
             "</td>",
-          '<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:#16a34a;">' +
-            ready +
-            "</td>",
+          // '<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:#16a34a;">' +
+          //   ready +
+          //   "</td>",
           "</tr>",
         ].join("");
       }),
       "</tbody>",
       "</table>",
       "</div>",
-      '<div style="display:grid;grid-template-columns:1fr 1fr ;gap:12px;margin:24px 0;">',
-      '<div style="padding:14px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;text-align:center;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">Total Items</div><div style="font-size:22px;font-weight:900;color:#1e293b;">' +
-        totalItems +
-        "</div></div>",
-      '<div style="padding:14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;text-align:center;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">Total Ready</div><div style="font-size:22px;font-weight:900;color:#16a34a;">' +
-        totalReady +
-        "</div></div>",
+      '<div style="display: flex; justify-content: flex-end; margin: 24px 0;">',
+      '<div style="width: 150px; padding:12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; text-align:center;">',
+      '<div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px;">Total Items</div>',
+      '<div style="font-size:20px; font-weight:900; color:#1e293b;">' + totalItems + '</div>',
+      "</div>",
+      "</div>",
       '<div class="footer">',
       "</div>",
       "</body></html>",
