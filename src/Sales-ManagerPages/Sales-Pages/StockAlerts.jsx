@@ -42,6 +42,9 @@ export default function SalesStock() {
   const [qcDamageMap, setQcDamageMap] = useState({});
   const [soPartialMap, setSoPartialMap] = useState({});
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
+
   // ── Load QC damage + SO partial maps ──
   useEffect(() => {
     const loadQCData = async () => {
@@ -233,60 +236,6 @@ export default function SalesStock() {
   const getSOPending = (item) => soPartialMap[item.productCode] || null;
   const getSOShortage = (item) => parseFloat(item.soShortage || 0);
   const [unitFilter, setUnitFilter] = useState("__ALL__");
-  const shortageCount = stockItems.filter(
-    (s) => getItemStatus(s) === "shortage",
-  ).length;
-  const lowCount = stockItems.filter((s) => getItemStatus(s) === "low").length;
-  const reorderCount = stockItems.filter(
-    (s) => getItemStatus(s) === "reorder",
-  ).length;
-
-  // const filtered = useMemo(() => {
-  //   return stockItems.filter((s) => {
-  //     const matchSearch =
-  //       (s.description || "").toLowerCase().includes(search.toLowerCase()) ||
-  //       (s.productCode || "").toLowerCase().includes(search.toLowerCase()) ||
-  //       (s.ledger || []).some((l) =>
-  //         (l.ref || "").toLowerCase().includes(search.toLowerCase()),
-  //       );
-  //     const matchCategory =
-  //       categoryFilter === "__ALL__" || s.categoryName === categoryFilter;
-  //     const matchAlert = !filterLow || getItemStatus(s) !== "ok";
-  //     const matchStatus =
-  //       statusFilter === "__ALL__" ||
-  //       (statusFilter === "damaged"
-  //         ? getDamagedQty(s) > 0
-  //         : statusFilter === "partial"
-  //           ? !!getSOPending(s)
-  //           : statusFilter === "shortage_qc"
-  //             ? s.qcIssue === "shortage"
-  //             : statusFilter === "quality"
-  //               ? s.qcIssue === "quality"
-  //               : statusFilter === "excess"
-  //                 ? s.qcIssue === "excess"
-  //                 : getItemStatus(s) === statusFilter);
-  //     const matchUnit =
-  //       unitFilter === "__ALL__" ||
-  //       (s.unit || "").toLowerCase() === unitFilter.toLowerCase();
-  //     return (
-  //       matchSearch &&
-  //       matchCategory &&
-  //       matchAlert &&
-  //       matchStatus &&
-  //       matchVendor &&
-  //       matchUnit
-  //     );
-  //   });
-  // }, [
-  //   stockItems,
-  //   search,
-  //   filterLow,
-  //   categoryFilter,
-  //   statusFilter,
-  //   vendorFilter,
-  //   qcDamageMap,
-  //   soPartialMap,
-  // ]);
 
   const filtered = useMemo(() => {
     return stockItems.filter((s) => {
@@ -338,6 +287,24 @@ export default function SalesStock() {
     qcDamageMap,
     soPartialMap,
   ]);
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filtered.slice(start, start + ITEMS_PER_PAGE);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, categoryFilter, statusFilter, vendorFilter, unitFilter, filterLow]);
+
+  const shortageCount = stockItems.filter(
+    (s) => getItemStatus(s) === "shortage",
+  ).length;
+  const lowCount = stockItems.filter((s) => getItemStatus(s) === "low").length;
+  const reorderCount = stockItems.filter(
+    (s) => getItemStatus(s) === "reorder",
+  ).length;
 
   return (
     <div className="space-y-5">
@@ -483,277 +450,315 @@ export default function SalesStock() {
             <p className="text-sm text-slate-400">Fetching stock data...</p>
           </div>
         ) : (
-          <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-320px)]">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-white">
-                <tr className="bg-slate-50 text-[11px] font-extrabold text-slate-400 uppercase tracking-widest border-b border-slate-200">
-                  <th className="px-5 py-3 text-left">No</th>
-                  <th className="px-4 py-3 text-left">Description</th>
-                  <th className="px-4 py-3 text-center">Part No.</th>
-                  <th className="px-4 py-3 text-center">HSN/SAC</th>
-                  <th className="px-4 py-3 text-center">Available</th>
-                  <th className="px-4 py-3 text-center">Reserved</th>
-                  <th className="px-4 py-3 text-center">Reorder Qty</th>
-                  <th className="px-4 py-3 text-center">Unit</th>
-                  <th className="px-4 py-3 text-center">Status</th>
-                  <th className="px-4 py-3 text-center">Ledger</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filtered.map((item, idx) => {
-                  const avail = Math.max(0, item.available ?? 0);
-                  const reserved = item.reserved || 0;
-                  const reorderQty = item.reorder || 0;
-                  const status = getItemStatus(item);
-                  const hasReorder = reorderQty > 0;
-                  const damagedQty = getDamagedQty(item);
-                  const hasDamage = damagedQty > 0;
-                  const soPending = getSOPending(item);
-                  const soShortage = getSOShortage(item);
-                  const qcIssue = item.qcIssue || "";
+          <>
+            <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-320px)]">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-white">
+                  <tr className="bg-slate-50 text-[11px] font-extrabold text-slate-400 uppercase tracking-widest border-b border-slate-200">
+                    <th className="px-5 py-3 text-left">No</th>
+                    <th className="px-4 py-3 text-left">Description</th>
+                    <th className="px-4 py-3 text-center">Part No.</th>
+                    <th className="px-4 py-3 text-center">HSN/SAC</th>
+                    <th className="px-4 py-3 text-center">Available</th>
+                    <th className="px-4 py-3 text-center">Reserved</th>
+                    <th className="px-4 py-3 text-center">Reorder Qty</th>
+                    <th className="px-4 py-3 text-center">Unit</th>
+                    <th className="px-4 py-3 text-center">Status</th>
+                    <th className="px-4 py-3 text-center">Ledger</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {paginatedItems.map((item, idx) => {
+                    const avail = Math.max(0, item.available ?? 0);
+                    const reserved = item.reserved || 0;
+                    const reorderQty = item.reorder || 0;
+                    const status = getItemStatus(item);
+                    const hasReorder = reorderQty > 0;
+                    const damagedQty = getDamagedQty(item);
+                    const hasDamage = damagedQty > 0;
+                    const soPending = getSOPending(item);
+                    const soShortage = getSOShortage(item);
+                    const qcIssue = item.qcIssue || "";
 
-                  // ✅ rowBg — qcIssue based colors
-                  const rowBg = hasDamage
-                    ? "bg-red-50/30"
-                    : qcIssue === "shortage"
-                      ? "bg-orange-50/20"
-                      : qcIssue === "quality"
-                        ? "bg-amber-50/20"
-                        : qcIssue === "excess"
-                          ? "bg-purple-50/20"
-                          : qcIssue === "wrong_item"
-                            ? "bg-blue-50/20"
-                            : soPending
-                              ? "bg-amber-50/20"
-                              : status === "shortage"
-                                ? "bg-red-50/40"
-                                : hasReorder
-                                  ? "bg-orange-50/30"
-                                  : status === "low"
-                                    ? "bg-amber-50/30"
-                                    : status === "reorder"
-                                      ? "bg-orange-50/20"
-                                      : "";
+                    // ✅ rowBg — qcIssue based colors
+                    const rowBg = hasDamage
+                      ? "bg-red-50/30"
+                      : qcIssue === "shortage"
+                        ? "bg-orange-50/20"
+                        : qcIssue === "quality"
+                          ? "bg-amber-50/20"
+                          : qcIssue === "excess"
+                            ? "bg-purple-50/20"
+                            : qcIssue === "wrong_item"
+                              ? "bg-blue-50/20"
+                              : soPending
+                                ? "bg-amber-50/20"
+                                : status === "shortage"
+                                  ? "bg-red-50/40"
+                                  : hasReorder
+                                    ? "bg-orange-50/30"
+                                    : status === "low"
+                                      ? "bg-amber-50/30"
+                                      : status === "reorder"
+                                        ? "bg-orange-50/20"
+                                        : "";
 
-                  const availColor =
-                    status === "shortage"
-                      ? "text-red-500"
-                      : status === "low"
-                        ? "text-amber-600"
-                        : status === "reorder"
-                          ? "text-orange-500"
-                          : "text-teal-600";
+                    const availColor =
+                      status === "shortage"
+                        ? "text-red-500"
+                        : status === "low"
+                          ? "text-amber-600"
+                          : status === "reorder"
+                            ? "text-orange-500"
+                            : "text-teal-600";
 
-                  return (
-                    <tr
-                      key={item.id}
-                      className={`hover:bg-slate-50/60 transition-colors ${rowBg}`}
-                    >
-                      <td className="px-5 py-3.5 text-slate-400 text-xs font-semibold">
-                        {idx + 1}
-                      </td>
+                    return (
+                      <tr
+                        key={item.id}
+                        className={`hover:bg-slate-50/60 transition-colors ${rowBg}`}
+                      >
+                        <td className="px-5 py-3.5 text-slate-400 text-xs font-semibold">
+                          {(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}
+                        </td>
 
-                      {/* ✅ Description — Damage + QC Issue badges */}
-                      <td className="px-4 py-3.5 text-slate-800 font-medium max-w-xs">
-                        <div className="truncate">
-                          {item.description || "—"}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1 mt-1">
-                          {/* 🔴 Damage */}
+                        {/* ✅ Description — Damage + QC Issue badges */}
+                        <td className="px-4 py-3.5 text-slate-800 font-medium max-w-xs">
+                          <div className="truncate">
+                            {item.description || "—"}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1 mt-1">
+                            {/* 🔴 Damage */}
+                            {hasDamage && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-red-100 text-red-600 border border-red-200">
+                                <FiAlertTriangle size={9} /> {damagedQty} Damaged
+                              </span>
+                            )}
+                            {/* 🟠 Shortage (QC) */}
+                            {!hasDamage && qcIssue === "shortage" && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-orange-100 text-orange-700 border border-orange-200">
+                                🟠 Shortage
+                              </span>
+                            )}
+                            {/* 🟡 Quality */}
+                            {!hasDamage && qcIssue === "quality" && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                                🟡 Quality Issue
+                              </span>
+                            )}
+                            {/* 🟣 Excess */}
+                            {!hasDamage && qcIssue === "excess" && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-purple-100 text-purple-700 border border-purple-200">
+                                🟣 Excess
+                              </span>
+                            )}
+                            {/* 🔵 Wrong Item */}
+                            {!hasDamage && qcIssue === "wrong_item" && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700 border border-blue-200">
+                                🔵 Wrong Item
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3.5 text-center">
+                          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono font-medium">
+                            {item.productCode || "—"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-center text-xs text-slate-500 font-mono">
+                          {item.hsnSac || "—"}
+                        </td>
+
+                        <td className="px-4 py-3.5 text-center">
+                          <span className={`font-black text-base ${availColor}`}>
+                            {avail}
+                          </span>
                           {hasDamage && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-red-100 text-red-600 border border-red-200">
-                              <FiAlertTriangle size={9} /> {damagedQty} Damaged
-                            </span>
+                            <p className="text-[10px] text-red-400 font-bold mt-0.5 leading-none">
+                              +{damagedQty} dmg
+                            </p>
                           )}
-                          {/* 🟠 Shortage (QC) */}
-                          {!hasDamage && qcIssue === "shortage" && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-orange-100 text-orange-700 border border-orange-200">
-                              🟠 Shortage
-                            </span>
-                          )}
-                          {/* 🟡 Quality */}
-                          {!hasDamage && qcIssue === "quality" && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                              🟡 Quality Issue
-                            </span>
-                          )}
-                          {/* 🟣 Excess */}
-                          {!hasDamage && qcIssue === "excess" && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-purple-100 text-purple-700 border border-purple-200">
-                              🟣 Excess
-                            </span>
-                          )}
-                          {/* 🔵 Wrong Item */}
-                          {!hasDamage && qcIssue === "wrong_item" && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700 border border-blue-200">
-                              🔵 Wrong Item
-                            </span>
-                          )}
-                        </div>
-                      </td>
+                        </td>
 
-                      <td className="px-4 py-3.5 text-center">
-                        <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono font-medium">
-                          {item.productCode || "—"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-center text-xs text-slate-500 font-mono">
-                        {item.hsnSac || "—"}
-                      </td>
-
-                      <td className="px-4 py-3.5 text-center">
-                        <span className={`font-black text-base ${availColor}`}>
-                          {avail}
-                        </span>
-                        {hasDamage && (
-                          <p className="text-[10px] text-red-400 font-bold mt-0.5 leading-none">
-                            +{damagedQty} dmg
-                          </p>
-                        )}
-                      </td>
-
-                      {/* Reserved */}
-                      <td className="px-4 py-3.5 text-center">
-                        {reserved > 0 ? (
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="font-black text-amber-600 text-base">
-                              {/* {reserved} */}
-                              {reserved > 0 ? reserved : "—"}
-                            </span>
-                            {/* <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200 whitespace-nowrap">
-                              <FiPackage size={8} /> SO Pending
-                            </span>
-                            {soShortage > 0 && (
+                        {/* Reserved */}
+                        <td className="px-4 py-3.5 text-center">
+                          {reserved > 0 ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="font-black text-amber-600 text-base">
+                                {/* {reserved} */}
+                                {reserved > 0 ? reserved : "—"}
+                              </span>
+                            </div>
+                          ) : soShortage > 0 ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-slate-400 text-sm font-semibold">
+                                0
+                              </span>
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold rounded-full bg-orange-100 text-orange-700 border border-orange-200 whitespace-nowrap">
                                 ⚠ {soShortage} short
                               </span>
-                            )} */}
-                          </div>
-                        ) : soShortage > 0 ? (
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="text-slate-400 text-sm font-semibold">
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 text-sm font-semibold">
                               0
                             </span>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold rounded-full bg-orange-100 text-orange-700 border border-orange-200 whitespace-nowrap">
-                              ⚠ {soShortage} short
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-300 text-sm font-semibold">
-                            0
-                          </span>
-                        )}
-                      </td>
+                          )}
+                        </td>
 
-                      <td className="px-4 py-3.5 text-center">
-                        {hasReorder ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-orange-50 text-orange-700 border border-orange-200">
-                            +{reorderQty}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 text-xs">—</span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3.5 text-center text-xs text-slate-400 uppercase">
-                        {item.unit || "nos"}
-                      </td>
-
-                      {/* ✅ Status column — stock status + QC badges */}
-                      <td className="px-4 py-3.5 text-center">
-                        <div className="flex flex-col items-center gap-1">
-                          {/* Stock level status */}
-                          {status === "shortage" ? (
-                            <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2 py-1 rounded-full">
-                              SHORTAGE
-                            </span>
-                          ) : status === "low" ? (
-                            <span className="text-[10px] font-bold bg-amber-100 text-amber-600 px-2 py-1 rounded-full">
-                              LOW
-                            </span>
-                          ) : status === "reorder" ? (
-                            <span className="text-[10px] font-bold bg-orange-100 text-orange-600 px-2 py-1 rounded-full">
-                              REORDER
+                        <td className="px-4 py-3.5 text-center">
+                          {hasReorder ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-orange-50 text-orange-700 border border-orange-200">
+                              +{reorderQty}
                             </span>
                           ) : (
-                            <span className="text-[10px] font-bold bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full">
-                              OK
-                            </span>
+                            <span className="text-slate-300 text-xs">—</span>
                           )}
+                        </td>
 
-                          {/* 🔴 Damage badge */}
-                          {hasDamage && (
-                            <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full flex items-center gap-1">
-                              <FiAlertTriangle size={8} /> DAMAGE
-                            </span>
-                          )}
+                        <td className="px-4 py-3.5 text-center text-xs text-slate-400 uppercase">
+                          {item.unit || "nos"}
+                        </td>
 
-                          {/* ✅ QC Issue badges — shortage/quality/excess/wrong */}
-                          {!hasDamage && qcIssue === "shortage" && (
-                            <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                              🟠 SHORTAGE
-                            </span>
-                          )}
-                          {!hasDamage && qcIssue === "quality" && (
-                            <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                              🟡 QUALITY
-                            </span>
-                          )}
-                          {!hasDamage && qcIssue === "excess" && (
-                            <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                              🟣 EXCESS
-                            </span>
-                          )}
-                          {!hasDamage && qcIssue === "wrong_item" && (
-                            <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                              🔵 WRONG
-                            </span>
-                          )}
+                        {/* ✅ Status column — stock status + QC badges */}
+                        <td className="px-4 py-3.5 text-center">
+                          <div className="flex flex-col items-center gap-1">
+                            {/* Stock level status */}
+                            {status === "shortage" ? (
+                              <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2 py-1 rounded-full">
+                                SHORTAGE
+                              </span>
+                            ) : status === "low" ? (
+                              <span className="text-[10px] font-bold bg-amber-100 text-amber-600 px-2 py-1 rounded-full">
+                                LOW
+                              </span>
+                            ) : status === "reorder" ? (
+                              <span className="text-[10px] font-bold bg-orange-100 text-orange-600 px-2 py-1 rounded-full">
+                                REORDER
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full">
+                                OK
+                              </span>
+                            )}
 
-                          {/* SO Partial */}
-                          {soPending && (
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                                soPending.source === "qc_shortage"
-                                  ? "bg-violet-100 text-violet-700"
-                                  : "bg-amber-100 text-amber-700"
-                              }`}
-                            >
-                              <FiPackage size={8} />
-                              {soPending.source === "qc_shortage"
-                                ? "SO SHORT"
-                                : "PARTIAL"}
-                            </span>
-                          )}
-                        </div>
-                      </td>
+                            {/* 🔴 Damage badge */}
+                            {hasDamage && (
+                              <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <FiAlertTriangle size={8} /> DAMAGE
+                              </span>
+                            )}
 
-                      <td className="px-4 py-3.5 text-center">
-                        <button
-                          onClick={() => setLedgerItem(item)}
-                          className="flex items-center gap-1 mx-auto text-teal-600 hover:text-teal-800 text-xs font-semibold bg-teal-50 hover:bg-teal-100 px-2.5 py-1.5 rounded-lg transition-colors"
-                        >
-                          <FiEye size={12} /> View
-                        </button>
+                            {/* ✅ QC Issue badges — shortage/quality/excess/wrong */}
+                            {!hasDamage && qcIssue === "shortage" && (
+                              <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                🟠 SHORTAGE
+                              </span>
+                            )}
+                            {!hasDamage && qcIssue === "quality" && (
+                              <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                🟡 QUALITY
+                              </span>
+                            )}
+                            {!hasDamage && qcIssue === "excess" && (
+                              <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                🟣 EXCESS
+                              </span>
+                            )}
+                            {!hasDamage && qcIssue === "wrong_item" && (
+                              <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                🔵 WRONG
+                              </span>
+                            )}
+
+                            {/* SO Partial */}
+                            {soPending && (
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                                  soPending.source === "qc_shortage"
+                                    ? "bg-violet-100 text-violet-700"
+                                    : "bg-amber-100 text-amber-700"
+                                }`}
+                              >
+                                <FiPackage size={8} />
+                                {soPending.source === "qc_shortage"
+                                  ? "SO SHORT"
+                                  : "PARTIAL"}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3.5 text-center">
+                          <button
+                            onClick={() => setLedgerItem(item)}
+                            className="flex items-center gap-1 mx-auto text-teal-600 hover:text-teal-800 text-xs font-semibold bg-teal-50 hover:bg-teal-100 px-2.5 py-1.5 rounded-lg transition-colors"
+                          >
+                            <FiEye size={12} /> View
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={10}
+                        className="text-center py-14 text-slate-400 text-sm"
+                      >
+                        {stockItems.length === 0
+                          ? "No stock data yet. Upload a PO to add stock."
+                          : "No items match your search"}
                       </td>
                     </tr>
-                  );
-                })}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={10}
-                      className="text-center py-14 text-slate-400 text-sm"
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls UI */}
+            <div className="px-5 py-3 border-t border-slate-100 bg-white flex items-center justify-between">
+              <div className="text-xs text-slate-500 font-medium">
+                Showing <span className="text-slate-900 font-bold">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{" "}
+                <span className="text-slate-900 font-bold">{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)}</span> of{" "}
+                <span className="text-slate-900 font-bold">{filtered.length}</span> items
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => prev - 1)}
+                  className="px-3 py-1.5 text-xs font-bold border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-all"
+                >
+                  Prev
+                </button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                   let pageNum = 1;
+                   if (totalPages <= 5) pageNum = i + 1;
+                   else if (currentPage <= 3) pageNum = i + 1;
+                   else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                   else pageNum = currentPage - 2 + i;
+                   
+                   if (pageNum <= 0 || pageNum > totalPages) return null;
+
+                   return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-8 h-8 text-xs font-bold rounded-lg transition-all ${currentPage === pageNum ? "bg-teal-600 text-white" : "text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-200"}`}
                     >
-                      {stockItems.length === 0
-                        ? "No stock data yet. Upload a PO to add stock."
-                        : "No items match your search"}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                      {pageNum}
+                    </button>
+                   )
+                })}
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  className="px-3 py-1.5 text-xs font-bold border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-30 transition-all"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </Card>
 
