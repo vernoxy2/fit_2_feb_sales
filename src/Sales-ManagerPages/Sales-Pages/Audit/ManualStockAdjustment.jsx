@@ -12,6 +12,8 @@ import {
   addDoc,
   serverTimestamp,
   arrayUnion,
+  onSnapshot,
+  writeBatch,
 } from "firebase/firestore";
 
 const generateDocId = (type = "ADJ") => {
@@ -57,6 +59,32 @@ const ManualStockAdjustment = () => {
     email: "",
     uid: "",
   });
+
+  const [allCategoriesData, setAllCategoriesData] = useState([]);
+  const [allStockItems, setAllStockItems] = useState([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const snap = await getDocs(collection(db, "stockCategories"));
+        const cats = snap.docs.map((d) => d.data());
+        setAllCategoriesData(cats);
+      } catch (err) {
+        console.error("Error fetching categories:", err);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "stock"), (snapshot) => {
+      const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setAllStockItems(items);
+    }, (err) => {
+      console.error("Error subscribing to stock:", err);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
@@ -215,9 +243,7 @@ const ManualStockAdjustment = () => {
         setIsManualEntry(true);
         setCurrentAdjustment((prev) => ({
           ...prev,
-          productName: "",
           systemStock: 0,
-          unit: "",
         }));
       }
     } catch (err) {
@@ -278,7 +304,7 @@ const ManualStockAdjustment = () => {
     setAdjustments((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleProductNameSearch = async (value) => {
+  const handleProductNameSearch = (value) => {
     setCurrentAdjustment({ ...currentAdjustment, productName: value });
     setStockStatus("");
     if (value.length < 2) {
@@ -286,67 +312,86 @@ const ManualStockAdjustment = () => {
       return;
     }
 
-    try {
-      const snap = await getDocs(collection(db, "stockCategories"));
-      const matches = [];
-      snap.docs.forEach((d) => {
-        const cat = d.data();
-        (cat.subcategories || []).forEach((sub) => {
-          if ((sub.name || "").toLowerCase().includes(value.toLowerCase())) {
-            matches.push({ name: sub.name, unit: sub.unit || "" });
-          }
-        });
-      });
-      setNameSuggestions(matches.slice(0, 10));
-      setShowSuggestions(true);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-  const handleSelectSuggestion = async (suggestion) => {
-    setShowSuggestions(false);
-    setCurrentAdjustment((prev) => ({
-      ...prev,
-      productName: suggestion.name,
-      unit: suggestion.unit || "",
-      productCode: "",
-      systemStock: 0,
-    }));
+    const val = value.toLowerCase();
+    const matches = [];
 
-    // stock collection ma search by description
-    try {
-      const q = query(
-        collection(db, "stock"),
-        where("description", "==", suggestion.name),
-      );
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const d = snap.docs[0];
-        const item = d.data();
-        setStockDocId(d.id);
-        setIsManualEntry(false);
-        setStockStatus("found");
-        setCurrentAdjustment((prev) => ({
-          ...prev,
-          productName: suggestion.name,
-          productCode: item.productCode || "",
-          systemStock: item.available ?? 0,
-          unit: item.unit || suggestion.unit || "",
-        }));
-      } else {
-        setStockDocId(null);
-        setIsManualEntry(true);
-        setStockStatus("notfound");
-        setCurrentAdjustment((prev) => ({
-          ...prev,
-          productName: suggestion.name,
-          productCode: "",
-          systemStock: 0,
-          unit: suggestion.unit || "",
-        }));
+    // 1. Search in Categories (subcategories)
+    allCategoriesData.forEach((cat) => {
+      (cat.subcategories || []).forEach((sub) => {
+        if ((sub.name || "").toLowerCase().includes(val)) {
+          matches.push({
+            name: sub.name,
+            unit: sub.unit || "",
+            source: "category",
+          });
+        }
+      });
+    });
+
+    // 2. Search in Stock (description or productCode)
+    allStockItems.forEach((item) => {
+      const desc = (item.description || "").toLowerCase();
+      const code = (item.productCode || "").toLowerCase();
+
+      if (desc.includes(val) || code.includes(val)) {
+        // check if name already exists in matches (from category)
+        const existingIdx = matches.findIndex(
+          (m) => m.name.toLowerCase() === (item.description || "").toLowerCase(),
+        );
+
+        if (existingIdx !== -1) {
+          // Merge stock details into the category match
+          matches[existingIdx] = {
+            ...matches[existingIdx],
+            productCode: item.productCode || "",
+            systemStock: item.available ?? 0,
+            stockDocId: item.id,
+            source: "both",
+          };
+        } else {
+          matches.push({
+            name: item.description || item.productName || "",
+            unit: item.unit || "",
+            productCode: item.productCode || "",
+            systemStock: item.available ?? 0,
+            stockDocId: item.id,
+            source: "stock",
+          });
+        }
       }
-    } catch (err) {
-      console.error(err);
+    });
+
+    setNameSuggestions(matches.slice(0, 15));
+    setShowSuggestions(true);
+  };
+
+  const handleSelectSuggestion = (suggestion) => {
+    setShowSuggestions(false);
+
+    if (suggestion.stockDocId) {
+      // ✅ Found in stock
+      setStockDocId(suggestion.stockDocId);
+      setIsManualEntry(false);
+      setStockStatus("found");
+      setCurrentAdjustment((prev) => ({
+        ...prev,
+        productName: suggestion.name,
+        productCode: suggestion.productCode || "",
+        systemStock: suggestion.systemStock ?? 0,
+        unit: suggestion.unit || prev.unit,
+      }));
+    } else {
+      // ❌ Only in category (new item)
+      setStockDocId(null);
+      setIsManualEntry(true);
+      setStockStatus("notfound");
+      setCurrentAdjustment((prev) => ({
+        ...prev,
+        productName: suggestion.name,
+        productCode: "",
+        systemStock: 0,
+        unit: suggestion.unit || prev.unit,
+      }));
     }
   };
   // ── Single: Submit ──
@@ -436,8 +481,8 @@ const ManualStockAdjustment = () => {
         createdAt: serverTimestamp(),
       });
 
-      alert(
-        `✅ ${adjustments.length} adjustment(s) applied & submitted for review! (ID: ${docId})`,
+      setSuccessMsg(
+        `${adjustments.length} adjustment(s) applied & submitted for review!\n\nID: ${docId}`,
       );
       setAdjustments([]);
       setVerificationSource(null);
@@ -638,6 +683,55 @@ const ManualStockAdjustment = () => {
   //   reader.readAsBinaryString(file);
   //   e.target.value = "";
   // };
+  // ── Robust Matching Helpers ──
+  const normalize = (str) => {
+    return String(str || "")
+      .toLowerCase()
+      .replace(/\s+/g, "") // remove all spaces
+      .replace(/[^a-z0-9]/g, ""); // remove special chars
+  };
+
+  const findExistingStockItem = (code, name) => {
+    if (!allStockItems || allStockItems.length === 0) return null;
+
+    const normCode = code ? normalize(code) : null;
+    const normName = name ? normalize(name) : null;
+
+    // 1. Try exact match on code
+    if (code) {
+      const match = allStockItems.find(
+        (s) => (s.productCode || "").trim() === code.trim()
+      );
+      if (match) return match;
+    }
+
+    // 2. Try exact match on description
+    if (name) {
+      const match = allStockItems.find(
+        (s) => (s.description || "").trim().toLowerCase() === name.trim().toLowerCase()
+      );
+      if (match) return match;
+    }
+
+    // 3. Try normalized match on code
+    if (normCode) {
+      const match = allStockItems.find(
+        (s) => normalize(s.productCode) === normCode
+      );
+      if (match) return match;
+    }
+
+    // 4. Try normalized match on description
+    if (normName) {
+      const match = allStockItems.find(
+        (s) => normalize(s.description) === normName
+      );
+      if (match) return match;
+    }
+
+    return null;
+  };
+
   const handleBulkUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -647,72 +741,114 @@ const ManualStockAdjustment = () => {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const wb = XLSX.read(evt.target.result, { type: "binary" });
+        const data = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(data, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
+        
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
-        const rowsFormatted = XLSX.utils.sheet_to_json(ws, {
-          header: 1,
-          raw: false,
-        });
+        const rowsFormatted = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
 
-        const dataRows = rows
-          .slice(2)
-          .filter((r) => r[0] !== undefined && r[0] !== null && r[0] !== "");
-        const dataRowsFormatted = rowsFormatted
-          .slice(2)
-          .filter((r) => r[0] !== undefined && r[0] !== null && r[0] !== "");
+        if (!rows || rows.length === 0) {
+          alert("The Excel file seems to be empty.");
+          setBulkValidating(false);
+          return;
+        }
+
+        // ── Smart Header Detection ──
+        let colMap = {
+          sl: -1,
+          desc: -1,
+          hsn: -1,
+          partNo: -1,
+          qty: -1,
+          unit: -1
+        };
+
+        let headerRowIdx = -1;
+
+        // Search first 20 rows for headers
+        for (let i = 0; i < Math.min(rows.length, 20); i++) {
+          const row = rows[i];
+          if (!row) continue;
+          
+          row.forEach((cell, cellIdx) => {
+            const val = String(cell || "").toLowerCase().trim();
+            if (val === "sl" || val === "no" || val === "sr no" || val === "s.no") colMap.sl = cellIdx;
+            
+            // Description mapping
+            if (val.includes("description") || val.includes("product name") || val.includes("item") || val.includes("goods") || val.includes("name")) {
+              if (!val.includes("code") && !val.includes("part")) { // avoid mapping code to desc
+                colMap.desc = cellIdx;
+              }
+            }
+
+            if (val.includes("hsn")) colMap.hsn = cellIdx;
+
+            // Part No mapping
+            if (val.includes("part no") || val.includes("product code") || val.includes("item code") || val.includes("part number")) {
+              colMap.partNo = cellIdx;
+            }
+
+            // 🎯 PRIORITY: Physical Qty
+            if (!val.includes("system") && !val.includes("diff")) {
+              if (val.includes("physical") || val.includes("actual") || val === "qty" || val === "quantity" || val === "count") {
+                colMap.qty = cellIdx;
+              } else if (colMap.qty === -1 && (val.includes("qty") || val.includes("quantity") || val.includes("stock"))) {
+                colMap.qty = cellIdx;
+              }
+            }
+
+            if (val.includes("unit")) colMap.unit = cellIdx;
+          });
+
+          // If we found at least Part No or Description AND Qty, this is likely our header row
+          if ((colMap.partNo !== -1 || colMap.desc !== -1) && colMap.qty !== -1) {
+            headerRowIdx = i;
+            break;
+          }
+        }
 
         const validated = [];
-        for (let rowIdx = 0; rowIdx < dataRows.length; rowIdx++) {
-          const row = dataRows[rowIdx];
-          const fmtRow = dataRowsFormatted[rowIdx] || [];
+        const startIdx = headerRowIdx + 1;
+        
+        for (let rowIdx = startIdx; rowIdx < rows.length; rowIdx++) {
+          const row = rows[rowIdx];
+          const fmtRow = rowsFormatted[rowIdx] || [];
+          if (!row || row.length === 0) continue;
 
-          const sl = row[0];
-          const description = String(row[1] || "").trim();
-          const hsnSac = String(row[8] || "").trim();
-          const partNo = String(row[9] || "").trim();
-          const physicalQty = parseFloat(row[10] ?? 0);
+          const partNo = colMap.partNo !== -1 ? String(row[colMap.partNo] || "").trim() : "";
+          const description = colMap.desc !== -1 ? String(row[colMap.desc] || "").trim() : "";
+          
+          if (!partNo && !description) continue;
+          
+          const effectiveCode = partNo || `ITEM-${rowIdx}`;
+          const physicalQty = colMap.qty !== -1 ? parseFloat(row[colMap.qty] ?? 0) : 0;
+          const hsnSac = colMap.hsn !== -1 ? String(row[colMap.hsn] || "").trim() : "";
+          const sl = colMap.sl !== -1 ? row[colMap.sl] : (rowIdx - headerRowIdx);
 
-          // Extract unit from formatted string e.g. "1000.000 MTR." → "MTR"
-          const fmtQtyStr = String(fmtRow[10] ?? "").trim();
-          const unitFromCell = fmtQtyStr
-            .replace(/[\d.,\s]/g, "")
-            .replace(/\.+$/, "")
-            .trim()
-            .toUpperCase();
-          const excelUnit =
-            String(row[11] || fmtRow[11] || "")
-              .trim()
-              .toUpperCase() ||
-            unitFromCell ||
-            "PCS";
-
-          if (!partNo) continue;
+          const fmtQtyStr = colMap.qty !== -1 ? String(fmtRow[colMap.qty] ?? "").trim() : "";
+          const unitFromCell = fmtQtyStr.replace(/[\d.,\s]/g, "").replace(/\.+$/, "").trim().toUpperCase();
+          const excelUnit = (colMap.unit !== -1 ? String(row[colMap.unit] || "").trim().toUpperCase() : "") || unitFromCell || "PCS";
 
           try {
-            const q = query(
-              collection(db, "stock"),
-              where("productCode", "==", partNo),
-            );
-            const snap = await getDocs(q);
-            if (!snap.empty) {
-              const d = snap.docs[0];
-              const item = d.data();
-              const systemStock = item.available ?? 0;
-              const adjustQty = physicalQty - systemStock;
+            // ✅ Use Robust Search
+            const existingItem = findExistingStockItem(partNo, description);
+
+            if (existingItem) {
+              const systemStock = Number(existingItem.available) || 0;
               validated.push({
                 sl,
-                productCode: partNo,
-                productName: item.description || description,
-                hsnSac,
+                productCode: existingItem.productCode || partNo || effectiveCode,
+                productName: existingItem.description || description || "Unnamed Item",
+                hsnSac: existingItem.hsnSac || hsnSac,
                 systemStock,
                 physicalQty,
-                adjustQty,
+                adjustQty: physicalQty - systemStock,
                 newTotal: physicalQty,
-                unit: excelUnit || item.unit || "PCS",
+                unit: excelUnit || existingItem.unit || "PCS",
                 reason: "Physical Verification Mismatch",
                 category: "Physical Verification Mismatch",
-                stockDocId: d.id,
+                stockDocId: existingItem.id,
                 isNew: false,
                 valid: true,
                 error: "",
@@ -720,8 +856,8 @@ const ManualStockAdjustment = () => {
             } else {
               validated.push({
                 sl,
-                productCode: partNo,
-                productName: description,
+                productCode: partNo || effectiveCode,
+                productName: description || "Unnamed Item",
                 hsnSac,
                 systemStock: 0,
                 physicalQty,
@@ -732,38 +868,27 @@ const ManualStockAdjustment = () => {
                 category: "Physical Verification Mismatch",
                 stockDocId: null,
                 isNew: true,
-                valid: false,
-                error: "New Item",
+                valid: true,
+                error: "",
               });
             }
-          } catch {
-            validated.push({
-              sl,
-              productCode: partNo,
-              productName: description,
-              hsnSac,
-              systemStock: 0,
-              physicalQty,
-              adjustQty: 0,
-              newTotal: 0,
-              unit: "PCS",
-              reason: "",
-              stockDocId: null,
-              isNew: false,
-              valid: false,
-              error: "Firebase error",
-            });
+          } catch (err) {
+            console.error("Row processing error:", err);
           }
         }
+
+        if (validated.length === 0) {
+          alert("Could not find any valid product data.");
+        }
+        
         setBulkRows(validated);
         setBulkPage(1);
       } catch (err) {
-        alert("Error reading file. Please check the format.");
-        console.error(err);
+        alert("Error reading file: " + err.message);
       }
       setBulkValidating(false);
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
     e.target.value = "";
   };
 
@@ -772,96 +897,107 @@ const ManualStockAdjustment = () => {
     if (rowsToProcess.length === 0) return;
     setShowConfirm(false);
     setBulkSubmitting(true);
+
     try {
       const docId = generateDocId("ADJ");
       const ref = `MANUAL-${docId}`;
+      const batch = writeBatch(db);
+      const adjustmentProducts = [];
 
       for (const row of rowsToProcess) {
-        if (row.isNew) {
-          // ── CREATE new stock document ──
-          await addDoc(collection(db, "stock"), {
-            productCode: row.productCode,
-            description: row.productName,
-            available: row.physicalQty,
-            unit: row.unit,
-            hsnSac: row.hsnSac || "",
-            ledger: [
-              {
-                type: "IN",
-                qty: row.physicalQty,
-                balance: row.physicalQty,
-                by: currentUser.name,
-                ref,
-                date: new Date().toISOString(),
-                remarks: `Initial Stock Entry — Bulk Physical Verification`,
-              },
-            ],
-            createdAt: serverTimestamp(),
-          });
-        } else {
-          // ── UPDATE existing stock document ──
-          const ledgerEntry = {
-            type: "BULK_ADJUSTMENT",
-            qty: Math.abs(row.adjustQty),
-            balance: row.newTotal,
-            by: currentUser.name,
-            ref,
-            date: new Date().toISOString(),
-            // remarks: `Manual Adjustment — ${row.reason || "Bulk Stock Audit"}`,
-            remarks: `Bulk Stock Adjustment — Physical Qty set to ${row.newTotal} ${row.unit}`,
-          };
-          await updateDoc(doc(db, "stock", row.stockDocId), {
-            available: row.newTotal,
-            unit: row.unit,
+        const physicalQty = Number(row.physicalQty) || 0;
+        let finalStockDocId = row.stockDocId;
+        let systemStock = Number(row.systemStock) || 0;
+        let isActuallyNew = row.isNew;
+
+        // Final safety check: Robust Search in case of double upload
+        if (!finalStockDocId) {
+          const existing = findExistingStockItem(row.productCode, row.productName);
+          if (existing) {
+            finalStockDocId = existing.id;
+            systemStock = Number(existing.available) || 0;
+            isActuallyNew = false;
+          }
+        }
+
+        const adjustmentAmt = physicalQty - systemStock;
+        const ledgerEntry = {
+          type: isActuallyNew ? "IN" : "BULK_ADJUSTMENT",
+          qty: Math.abs(adjustmentAmt),
+          balance: physicalQty,
+          by: currentUser.name || "System",
+          ref,
+          date: new Date().toISOString(),
+          remarks: isActuallyNew
+            ? `Initial Stock Entry — Bulk Physical Verification`
+            : `Bulk Stock Adjustment — Physical Qty set to ${physicalQty} ${row.unit}`,
+        };
+
+        if (!isActuallyNew && finalStockDocId) {
+          const stockRef = doc(db, "stock", finalStockDocId);
+          batch.update(stockRef, {
+            available: physicalQty,
+            unit: row.unit || "PCS",
+            status: physicalQty > 0 ? "In Stock" : "Out of Stock",
+            lastUpdated: serverTimestamp(),
             ledger: arrayUnion(ledgerEntry),
           });
+        } else {
+          const newStockRef = doc(collection(db, "stock"));
+          finalStockDocId = newStockRef.id;
+          batch.set(newStockRef, {
+            productCode: row.productCode,
+            description: row.productName,
+            available: physicalQty,
+            unit: row.unit || "PCS",
+            hsnSac: row.hsnSac || "",
+            status: physicalQty > 0 ? "In Stock" : "Out of Stock",
+            lastUpdated: serverTimestamp(),
+            lowStockThreshold: 10,
+            ledger: [ledgerEntry],
+            createdAt: serverTimestamp(),
+          });
         }
-      }
 
-      await addDoc(collection(db, "stockAdjustments"), {
-        docId,
-        type: "Stock Adjustment (Bulk)",
-        status: "done",
-        requestedBy: currentUser.name,
-        requestedByRole: currentUser.role,
-        department: currentUser.department,
-        approvalLevel: getApprovalLevel(
-          currentUser.role,
-          currentUser.department,
-        ),
-        totalProducts: rowsToProcess.length,
-        sourceVerificationId: verificationSource || null,
-        products: rowsToProcess.map((row) => ({
+        adjustmentProducts.push({
           productCode: row.productCode,
           productName: row.productName,
           hsnSac: row.hsnSac || "",
-          systemStock: row.systemStock,
-          physicalQty: row.physicalQty,
-          adjustment: row.adjustQty,
-          adjustQty: row.adjustQty,
-          newTotal: row.newTotal,
+          systemStock: systemStock,
+          physicalQty: physicalQty,
+          adjustment: adjustmentAmt,
+          adjustQty: adjustmentAmt,
+          newTotal: physicalQty,
           unit: row.unit,
           category: row.category || "Physical Verification Mismatch",
-          reason: row.reason || "Bulk Stock Audit",
-          isNewItem: row.isNew,
-          stockDocId: row.stockDocId || null,
-        })),
+          reason: row.reason || (isActuallyNew ? "New Item Entry" : "Bulk Stock Audit"),
+          isNewItem: isActuallyNew,
+          stockDocId: finalStockDocId,
+        });
+      }
+
+      const adjRef = doc(collection(db, "stockAdjustments"));
+      batch.set(adjRef, {
+        docId,
+        type: "Stock Adjustment (Bulk)",
+        status: "done",
+        requestedBy: currentUser.name || "System",
+        requestedByRole: currentUser.role || "",
+        department: currentUser.department || "",
+        approvalLevel: getApprovalLevel(currentUser.role, currentUser.department),
+        totalProducts: adjustmentProducts.length,
+        sourceVerificationId: verificationSource || null,
+        products: adjustmentProducts,
         createdAt: serverTimestamp(),
       });
 
+      await batch.commit();
       setBulkSubmitting(false);
       setBulkRows([]);
       setMode("");
-      setVerificationSource(null);
-      // alert(
-      //   `✅ ${rowsToProcess.filter((r) => !r.isNew).length} items updated, ` +
-      //     `${rowsToProcess.filter((r) => r.isNew).length} new items added to stock. (ID: ${docId})`,
-      // );
-      setSuccessMsg(
-        `✅ ${rowsToProcess.filter((r) => !r.isNew).length} items updated, ${rowsToProcess.filter((r) => r.isNew).length} new items added to stock.\n\nID: ${docId}`,
-      );
+      setSuccessMsg(`${adjustmentProducts.length} items processed successfully.\n\nID: ${docId}`);
     } catch (err) {
-      console.error(err);
+      console.error("Bulk Submission Error:", err);
       alert("Error: " + err.message);
       setBulkSubmitting(false);
     }
@@ -1088,15 +1224,25 @@ const ManualStockAdjustment = () => {
                 <input
                   type="number"
                   value={currentAdjustment.systemStock}
-                  readOnly
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700"
+                  readOnly={!isManualEntry}
+                  onChange={(e) =>
+                    setCurrentAdjustment({
+                      ...currentAdjustment,
+                      systemStock: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                  className={`w-full px-4 py-2 border rounded-lg ${
+                    isManualEntry
+                      ? "border-orange-400 bg-white text-gray-800 focus:ring-2 focus:ring-orange-400"
+                      : "border-gray-200 bg-gray-50 text-gray-700"
+                  }`}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Physical Qty *{" "}
+                  Final Physical Count *{" "}
                   <span className="text-xs text-gray-400">
-                    (+ to add, - to remove)
+                    (Sets total stock to this value)
                   </span>
                   {currentAdjustment.productName &&
                     currentAdjustment.adjustQty !== 0 &&
@@ -1130,7 +1276,7 @@ const ManualStockAdjustment = () => {
                       adjustQty: parseFloat(e.target.value) || 0,
                     })
                   }
-                  placeholder="e.g. 500 or -200"
+                  placeholder="Enter the actual count found"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
@@ -1766,21 +1912,40 @@ const ManualStockAdjustment = () => {
       )}
       {/* ── Success Modal ── */}
       {successMsg && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4 text-center">
-            <div className="text-5xl mb-4">✅</div>
-            <h2 className="text-lg font-bold text-gray-800 mb-3">
-              Stock Updated!
-            </h2>
-            <p className="text-sm text-gray-600 whitespace-pre-line">
-              {successMsg}
-            </p>
-            <button
-              onClick={() => setSuccessMsg("")}
-              className="mt-6 bg-green-600 text-white px-8 py-2.5 rounded-xl font-semibold hover:bg-green-700 transition-colors"
-            >
-              OK
-            </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all animate-in fade-in zoom-in duration-300">
+            <div className="bg-indigo-600 h-2 w-full" />
+            <div className="p-8">
+              <div className="flex justify-center mb-6">
+                <div className="bg-indigo-50 p-4 rounded-full">
+                  <span className="text-4xl text-indigo-600">📋</span>
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 text-center mb-4">
+                Adjustment Complete
+              </h2>
+              <div className="bg-gray-50 rounded-2xl p-6 mb-6">
+                <p className="text-gray-700 text-center leading-relaxed font-medium mb-4">
+                  {successMsg.split('\n\n')[0]}
+                </p>
+                {successMsg.includes('\n\nID:') && (
+                  <div className="border-t border-gray-200 pt-4 mt-2">
+                    <p className="text-xs text-gray-500 text-center uppercase tracking-wider mb-1">
+                      Adjustment Reference ID
+                    </p>
+                    <p className="text-lg font-mono font-bold text-indigo-700 text-center">
+                      {successMsg.split('\n\nID: ')[1]}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setSuccessMsg("")}
+                className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-lg hover:shadow-indigo-200 active:scale-[0.98]"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
