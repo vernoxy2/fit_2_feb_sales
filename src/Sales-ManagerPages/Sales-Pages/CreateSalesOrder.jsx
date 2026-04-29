@@ -22,10 +22,13 @@ import {
   increment,
   updateDoc,
   doc,
+  query,
+  where,
 } from "firebase/firestore";
 
 async function generateWONumber() {
-  const snap = await getDocs(collection(db, "salesorders"));
+  const q = query(collection(db, "excelupload"), where("type", "==", "so"));
+  const snap = await getDocs(q);
   const count = snap.size + 1;
   return `WO-${new Date().getFullYear()}-${String(count).padStart(4, "0")}`;
 }
@@ -200,7 +203,7 @@ export default function CreateSalesOrder() {
     salesPerson: "Current User",
     priority: "normal",
     deliveryDate: "",
-    approvalRequired: true,
+    approvalRequired: false,
     specialInstructions: "",
     technicalNotes: "",
     attachment: null,
@@ -278,50 +281,72 @@ export default function CreateSalesOrder() {
     if (!form.customer) return alert("Please select a customer!");
     if (!isDraft && !form.deliveryDate) return alert("Please set an expected delivery date!");
 
-    const status = isDraft ? "draft" : form.approvalRequired ? "pending_approval" : "approved";
+    // Aligning status with excelupload schema
+    // approved manual SO moves directly to waiting_for_qc for Store team
+    const soStatus = isDraft ? "draft" : form.approvalRequired ? "pending_approval" : "waiting_for_qc";
     const now = new Date().toISOString();
 
     setSubmitting(true);
     try {
-      await addDoc(collection(db, "salesorders"), {
-        woNumber:             form.woNumber,
-        date:                 form.date,
-        customer:             form.customer,
-        partyCode:            form.partyCode,
-        gstNo:                form.gstNo,
-        email:                form.email,
-        address:              form.address,
-        companyName:          form.companyName,
-        state:                form.state,
-        destination:          form.destination,
-        consignee:            form.consignee,
-        phone:                form.phone,
-        salesPerson:          form.salesPerson,
-        priority:             form.priority,
-        deliveryDate:         form.deliveryDate,
-        approvalRequired:     form.approvalRequired,
+      // Unified Data Structure (excelHeader + top-level meta)
+      await addDoc(collection(db, "excelupload"), {
+        type: "so",
+        soStatus,
+        woNumber: form.woNumber,
+        customer: form.customer,
+        deliveryDate: form.deliveryDate,
+        priority: form.priority,
+        mode: "manual",
+        
+        excelHeader: {
+          voucherNo:    form.woNumber,
+          dated:        form.date,
+          buyer:        form.customer,
+          consignee:    form.consignee,
+          address:      form.address,
+          gstin:        form.gstNo,
+          email:        form.email,
+          phone:        form.phone,
+          state:        form.state,
+          destination:  form.destination,
+          reference:    form.partyCode,
+          companyName:  form.companyName,
+          salesPerson:  form.salesPerson,
+        },
+
+        items: items.map(item => ({
+          ...item,
+          productCode: item.sku, // Normalization
+          orderedQty:  item.qty,
+          invoicedQty: 0,
+          itemStatus:  "pending"
+        })),
+
         specialInstructions:  form.specialInstructions,
         technicalNotes:       form.technicalNotes,
-        mode: "manual",
-        status,
-        items,
-        createdAt: serverTimestamp(),
-        createdBy: form.salesPerson,
+        approvalRequired:     form.approvalRequired,
+        createdAt:            now, // Use string ISO for consistency with excelupload if needed, or serverTimestamp. excelupload uses new Date().toISOString()
+        createdBy:            form.salesPerson,
         history: [{
           action: "CREATED",
           by: form.salesPerson,
           time: now,
-          description: `Order created with status: ${status}`,
+          description: `Order created with status: ${soStatus}`,
         }],
       });
-      await addDoc(collection(db, "notifications"), {
-        type: "so_qc_pending",
-        source: "so", target: "store",
-        refNo: form.woNumber, invoiceNo: "", productCode: "",
-        message: `🚚 New SO waiting for QC — ${form.woNumber} · ${form.customer}`,
-        isRead: false, isResolved: false,
-        createdAt: now, resolvedAt: null,
-      });
+
+      // Notification logic (only if not draft)
+      if (soStatus === "waiting_for_qc") {
+        await addDoc(collection(db, "notifications"), {
+          type: "so_qc_pending",
+          source: "so", target: "store",
+          refNo: form.woNumber, invoiceNo: "", productCode: "",
+          message: `🚚 New SO waiting for QC — ${form.woNumber} · ${form.customer}`,
+          isRead: false, isResolved: false,
+          createdAt: now, resolvedAt: null,
+        });
+      }
+
       if (!isDraft) {
         for (const item of items) {
           if (!item.stockDocId || !item.qty) continue;
@@ -333,7 +358,7 @@ export default function CreateSalesOrder() {
         }
       }
       alert(isDraft ? "Draft saved successfully!" : "Sales Order submitted successfully!");
-      navigate("/sales/sales-orders/List");
+      navigate("/sales/sales-orders/list");
     } catch (err) {
       console.error(err);
       alert("Error: " + err.message);

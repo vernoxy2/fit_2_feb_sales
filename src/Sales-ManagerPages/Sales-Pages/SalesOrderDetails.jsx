@@ -20,6 +20,8 @@ import { doc, getDoc } from "firebase/firestore";
 
 function SOStatusBadge({ status }) {
   const styles = {
+    draft:            "bg-slate-100 text-slate-600 border-slate-200",
+    pending_approval: "bg-amber-50 text-amber-700 border-amber-200",
     reserved:         "bg-blue-50 text-blue-700 border-blue-200",
     partial:          "bg-orange-50 text-orange-700 border-orange-200",
     partial_approved: "bg-orange-50 text-orange-700 border-orange-200",
@@ -30,6 +32,8 @@ function SOStatusBadge({ status }) {
     complete:         "bg-green-50 text-green-700 border-green-200",
   };
   const labels = {
+    draft:             "DRAFT",
+    pending_approval:  "PENDING APPROVAL",
     reserved:          "RESERVED",
     partial:           "PARTIAL",
     partial_approved:  "PARTIAL",
@@ -153,21 +157,21 @@ export default function SalesOrderDetails() {
               <div className="space-y-4">
                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Buyer (Bill To)</h4>
                 <div>
-                  <p className="text-sm font-black text-slate-800">{header.buyer || "—"}</p>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">{header.buyerAddress || "—"}</p>
+                  <p className="text-sm font-black text-slate-800">{header.buyer || so.customer || "—"}</p>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">{header.buyerAddress || header.address || so.address || "—"}</p>
                 </div>
-                {header.buyerGstin && (
+                {(header.buyerGstin || header.gstin) && (
                   <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100 w-fit">
                     <span className="text-[9px] font-black text-slate-400 uppercase">GSTIN</span>
-                    <span className="text-xs font-bold font-mono text-purple-600">{header.buyerGstin}</span>
+                    <span className="text-xs font-bold font-mono text-purple-600">{header.buyerGstin || header.gstin}</span>
                   </div>
                 )}
               </div>
               <div className="space-y-4 border-l border-slate-100 pl-8">
                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Consignee (Ship To)</h4>
                 <div>
-                  <p className="text-sm font-black text-slate-800">{header.consignee || "—"}</p>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">{header.address || "—"}</p>
+                  <p className="text-sm font-black text-slate-800">{header.consignee || so.consignee || header.buyer || so.customer || "—"}</p>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">{header.address || so.address || "—"}</p>
                 </div>
               </div>
             </div>

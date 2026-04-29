@@ -74,7 +74,7 @@ export default function SalesOrderQCList({
           {pendingSalesOrders.map((so) => {
             const header = so.excelHeader || so.invoiceHeader || {};
             const soNumber =
-              header.reference || so.invoiceNo || so.woNumber ||
+              so.woNumber || header.voucherNo || header.reference || so.invoiceNo ||
               `SO-${so.id.slice(0, 8).toUpperCase()}`;
             const customer = so.customer || header.consignee || header.buyer || "—";
             const totalItems = (so.items || []).length;

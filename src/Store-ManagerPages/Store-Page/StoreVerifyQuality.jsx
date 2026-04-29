@@ -377,7 +377,9 @@ export default function StoreVerifyQuality() {
       '<div style="display: flex; justify-content: flex-end; margin: 24px 0;">',
       '<div style="width: 150px; padding:12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; text-align:center;">',
       '<div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px;">Total Items</div>',
-      '<div style="font-size:20px; font-weight:900; color:#1e293b;">' + totalItems + '</div>',
+      '<div style="font-size:20px; font-weight:900; color:#1e293b;">' +
+        totalItems +
+        "</div>",
       "</div>",
       "</div>",
       '<div class="footer">',
@@ -604,26 +606,29 @@ export default function StoreVerifyQuality() {
   const fetchPendingInvoices = async () => {
     setLoadingInvoices(true);
     try {
-      const snap = await getDocs(
-        query(collection(db, "excelupload"), orderBy("createdAt", "desc")),
-      );
+      const snap = await getDocs(collection(db, "excelupload"));
       const allRaw = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
       const all = allRaw.filter((d) => {
         const t = (d.type || "").trim().toUpperCase();
         return t === "INVOICE" && !!d.linkedPoId;
       });
+
       const grouped = {};
       for (const inv of all) {
         const key = inv.invoiceNo || inv.id;
         if (!grouped[key]) {
           grouped[key] = inv;
         } else {
-          const existing = grouped[key].createdAt?.toDate?.() || new Date(0);
-          const current = inv.createdAt?.toDate?.() || new Date(0);
+          const existing = grouped[key].createdAt || 0;
+          const current = inv.createdAt || 0;
           if (current > existing) grouped[key] = inv;
         }
       }
-      setPendingInvoices(Object.values(grouped));
+
+      const result = Object.values(grouped);
+      result.sort((a, b) => ((b.createdAt || 0) > (a.createdAt || 0) ? 1 : -1));
+      setPendingInvoices(result);
     } catch (err) {
       console.error("Fetch invoices error:", err);
     } finally {
@@ -634,24 +639,48 @@ export default function StoreVerifyQuality() {
   const fetchPendingSalesOrders = async () => {
     setLoadingSO(true);
     try {
-      const snap = await getDocs(
-        query(collection(db, "excelupload"), orderBy("createdAt", "desc")),
-      );
-      const allSO = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      const soList = allSO.filter((d) => {
-        const isSOType = isSalesOrder(d.type);
-        const soSt = d.soStatus || d.status || "";
+      const [excelSnap, salesSnap] = await Promise.all([
+        getDocs(collection(db, "excelupload")),
+        getDocs(collection(db, "salesorders")),
+      ]);
+
+      const excelDocs = excelSnap.docs.map((d) => ({
+        id: d.id,
+        collection: "excelupload",
+        ...d.data(),
+      }));
+      const salesDocs = salesSnap.docs.map((d) => ({
+        id: d.id,
+        collection: "salesorders",
+        ...d.data(),
+      }));
+      const allRaw = [...excelDocs, ...salesDocs];
+
+      const soList = allRaw.filter((d) => {
+        const t = (d.type || "").trim().toLowerCase();
+        const st = d.soStatus || d.status || "";
+        const isSO =
+          t === "so" || t === "salesorder" || d.collection === "salesorders";
+
         return (
-          isSOType &&
+          isSO &&
           [
             "waiting_for_qc",
             "waitingforqc",
             "waiting for qc",
+            "pending_approval",
             "ready_for_dispatch",
             "partial_approved",
             "complete",
-          ].includes(soSt)
+            "approved", // legacy
+          ].includes(st)
         );
+      });
+
+      soList.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
       });
       setPendingSalesOrders(soList);
     } catch (err) {
@@ -667,20 +696,27 @@ export default function StoreVerifyQuality() {
   }, []);
 
   const handleSelectSO = async (so) => {
-    if (so.soStatus === "ready_for_dispatch" || so.soStatus === "complete") {
+    const collName = so.collection || "excelupload";
+    const currentStatus = so.soStatus || so.status || "";
+    const isComplete =
+      currentStatus === "ready_for_dispatch" || currentStatus === "complete";
+
+    if (isComplete) {
       const header = so.excelHeader || so.invoiceHeader || {};
       setSelectedSO({
         id: so.id,
+        collection: collName,
         soNumber:
+          so.woNumber ||
+          header.voucherNo ||
           header.reference ||
           so.invoiceNo ||
-          so.woNumber ||
           `SO-${so.id.slice(0, 8).toUpperCase()}`,
-        customer: so.customer || header.consignee || "—",
+        customer: so.customer || header.consignee || header.buyer || "—",
         deliveryDate: so.deliveryDate || header.dated || "",
         createdAt: so.createdAt || null,
         items: so.items || [],
-        soStatus: so.soStatus,
+        soStatus: currentStatus,
       });
       const items = (so.items || []).map((item) => ({
         ...item,
@@ -695,17 +731,19 @@ export default function StoreVerifyQuality() {
 
     setLoadingSO2(true);
     try {
-      const soSnap = await getDoc(doc(db, "excelupload", so.id));
+      const soSnap = await getDoc(doc(db, collName, so.id));
       if (!soSnap.exists()) {
         alert("SO not found.");
         await fetchPendingSalesOrders();
         setLoadingSO2(false);
         return;
       }
-      const soData = soSnap.data();
+      const soData = { id: soSnap.id, collection: collName, ...soSnap.data() };
+      const latestStatus = soData.soStatus || soData.status || "";
+
       if (
-        soData.soStatus === "ready_for_dispatch" ||
-        soData.soStatus === "complete"
+        latestStatus === "ready_for_dispatch" ||
+        latestStatus === "complete"
       ) {
         alert("⚠️ This SO has already been approved. Refreshing list...");
         await fetchPendingSalesOrders();
@@ -713,11 +751,12 @@ export default function StoreVerifyQuality() {
         return;
       }
       const isReopen =
-        soData.soStatus === "waiting_for_qc" && soData.soQcIssues?.length > 0;
+        (latestStatus === "waiting_for_qc" || latestStatus === "approved") &&
+        soData.soQcIssues?.length > 0;
       const soItemsRaw = soData.items || [];
       const mappedItems = await Promise.all(
         soItemsRaw.map(async (item) => {
-          const productCode = item.productCode?.toString().trim();
+          const productCode = item.productCode?.toString().trim() || item.sku;
           let stockAvailable = 0,
             stockDocId = null;
           if (productCode) {
@@ -734,7 +773,7 @@ export default function StoreVerifyQuality() {
               stockDocId = stockSnap.docs[0].id;
             }
           }
-          const orderedQty = item.quantity || item.orderedQty || 0;
+          const orderedQty = item.quantity || item.orderedQty || item.qty || 0;
           const lastIssue = isReopen ? item.soQcIssue || "" : "";
           const lastIssueDetail = isReopen ? item.soQcIssueDetail || "" : "";
           const savedReadyQty = item.soQcReadyQty ?? null;
@@ -745,6 +784,7 @@ export default function StoreVerifyQuality() {
               : defaultReadyQty;
           return {
             ...item,
+            productCode: productCode,
             orderedQty,
             stockAvailable,
             stockDocId,
@@ -761,16 +801,18 @@ export default function StoreVerifyQuality() {
       const header = soData.excelHeader || soData.invoiceHeader || {};
       setSelectedSO({
         id: soData.id || so.id,
+        collection: collName,
         soNumber:
+          soData.woNumber ||
+          header.voucherNo ||
           header.reference ||
           soData.invoiceNo ||
-          soData.woNumber ||
           `SO-${so.id.slice(0, 8).toUpperCase()}`,
-        customer: soData.customer || header.consignee || "—",
+        customer: soData.customer || header.consignee || header.buyer || "—",
         deliveryDate: soData.deliveryDate || header.dated || "",
         createdAt: soData.createdAt || null,
         items: soItemsRaw,
-        soStatus: soData.soStatus,
+        soStatus: latestStatus,
       });
       setSoItemsSync(mappedItems);
       setQualityCheck("passed");
@@ -834,7 +876,9 @@ export default function StoreVerifyQuality() {
           : allComplete && !hasIssues
             ? "ready_for_dispatch"
             : "partial_approved";
-      await updateDoc(doc(db, "excelupload", selectedSO.id), {
+
+      const collName = selectedSO.collection || "excelupload";
+      await updateDoc(doc(db, collName, selectedSO.id), {
         items: updatedItems,
         soStatus: newSoStatus,
         soQcStatus:

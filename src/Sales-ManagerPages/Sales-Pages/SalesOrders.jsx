@@ -106,8 +106,8 @@ export default function SalesOrder() {
             type: d.type || "",
             soStatus: d.soStatus || "",
             poStatus: d.poStatus || "",
-            woNumber: header.reference || d.invoiceNo || d.woNumber || `SO-${doc.id.slice(0, 8).toUpperCase()}`,
-            customer: d.customer || header.consignee || "",
+            woNumber: d.woNumber || header.voucherNo || header.reference || d.invoiceNo || `SO-${doc.id.slice(0, 8).toUpperCase()}`,
+            customer: d.customer || header.consignee || header.buyer || "",
             deliveryDate: formatDate(deliveryRaw),
             _deliveryDateRaw: deliveryRaw,
             totalValue: d.totalValue || d.grandTotal || 0,
@@ -118,6 +118,10 @@ export default function SalesOrder() {
             grandTotal: d.totalValue || d.grandTotal || 0,
             eta: formatDate(deliveryRaw),
           };
+        }).sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
         });
 
         // ✅ Map soStatus to display status — all 4 stages

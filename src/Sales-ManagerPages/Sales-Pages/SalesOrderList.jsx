@@ -34,6 +34,8 @@ function formatDateTime(isoStr) {
 
 function SOStatusBadge({ status }) {
   const styles = {
+    draft:            "bg-slate-100 text-slate-600 border-slate-200",
+    pending_approval: "bg-amber-50 text-amber-700 border-amber-200",
     reserved:         "bg-blue-50 text-blue-700 border-blue-200",
     partial:          "bg-orange-50 text-orange-700 border-orange-200",
     partial_approved: "bg-orange-50 text-orange-700 border-orange-200",
@@ -44,6 +46,8 @@ function SOStatusBadge({ status }) {
     complete:         "bg-green-50 text-green-700 border-green-200",
   };
   const labels = {
+    draft:             "DRAFT",
+    pending_approval:  "PENDING APPROVAL",
     reserved:          "RESERVED",
     partial:           "PARTIAL",
     partial_approved:  "PARTIAL",
@@ -214,6 +218,8 @@ export default function SalesOrderList() {
                 onChange={(e) => setFilterStatus(e.target.value)}
                 options={[
                   { value: "all",             label: "All Status" },
+                  { value: "draft",           label: "Draft" },
+                  { value: "pending_approval",label: "Pending Approval" },
                   { value: "reserved",        label: "Reserved" },
                   { value: "waiting_for_qc",  label: "Waiting for QC" },
                   { value: "partial",         label: "Partial" },
