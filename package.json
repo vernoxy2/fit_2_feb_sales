@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:main": "vite --mode production",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:main": "vite preview --mode production"
   },
   "dependencies": {
     "firebase": "^12.12.0",
